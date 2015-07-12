@@ -12,20 +12,26 @@
 
 // user schema for PSX
 #define PSX_SEL  SPI_CE0
-#define PSX_CLK  GPCLK0 // need re-wiring
+#define PSX_CLK  SPI_SCLK
 #define PSX_CMD  SPI_MOSI
 #define PSX_DAT  SPI_MISO
 #define PSX_ACK  P25
 
-static const useconds_t T = 32; // 1s / 256 KHz for 1 bit
+#define PSX_ACK_WAIT 60 // usec
+
+#define T 32 // 1s / 256 KHz for 1 bit
 
 char ioByte( char obyte ){
     char ibyte = 0x00;
     char bit = 0x01; // LSB first
-    int i;
+    int i, wait_ack_max;
     for( i = 0; i < 8; ++i ){
         // out
-        digitalWrite(PSX_CMD, HIGH);
+        if ( obyte & bit ){
+            digitalWrite(PSX_CMD, HIGH);
+        } else {
+            digitalWrite(PSX_CMD, LOW);
+        }
         digitalWrite(PSX_CLK, LOW);
         // delay
         usleep( T/2 );
@@ -38,18 +44,20 @@ char ioByte( char obyte ){
         bit <<= 1 ;
 
         // wait for ACK
-        while ( !digitalRead( PSX_ACK ) ){
+        wait_ack_max = 0;
+        while ( !digitalRead( PSX_ACK ) && wait_ack_max < PSX_ACK_WAIT){
             usleep(1);
+            ++wait_ack_max;
         }
     }
     digitalWrite(PSX_CMD, LOW);
-    digitalWrite(PSX_CLK, HIGH);
     return ibyte;
 }
 
 void ioByteArray( char arr[], char ret[], int len ){
     int i;
-    printf( "ioByteArray() T = %f", T );
+    printf( "ioByteArray() T = %ld\n", T );
+    digitalWrite(PSX_CLK, HIGH);
     digitalWrite( PSX_SEL, LOW );
     usleep( T/4 );
     for ( i = 0; i < len; ++i ) {
@@ -74,11 +82,19 @@ void getID(){
     char ret[ sizeof(cmd) ];
     ioByteArray( cmd, ret, sizeof(cmd) );
 
+    printf("sizeof cmd: %d\n", sizeof(cmd) );
+
     for(i = 0; i< sizeof(cmd); ++i ){
-        printf( "%c ", ret[i]);
-        if ( i % 16 == 0 )
+        if ( i % 16 == 0 ){
             puts("");
+            printf( "%d :\t", (i/16) * 16);
+        }
+        if ( i % 8 == 0 ){
+            printf(" ");
+        }
+        printf( "%0.2x ", ret[i]);
     }
+    puts("");
 }
 
 int main(int argc, char *argv[])
