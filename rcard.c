@@ -17,7 +17,6 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <fcntl.h>
-#include <wiringPi.h>
 #include <sys/ioctl.h>
 #include <linux/types.h>
 #include <linux/spi/spidev.h>
@@ -60,8 +59,24 @@ static const char *device = "/dev/spidev0.0";
 static uint8_t mode;
 static uint8_t lsb_first = 0;
 static uint8_t bits = 8;
-static uint32_t speed = 256000;
+static uint32_t speed = 244000;
 static uint16_t delay_usec_setting;
+
+// broadcom gpio schema
+#define SPI_CE0  8 // GPIO8, SPI_CE0
+#define SPI_SCLK  11 // GPIO 11, SPI_SCLK
+#define SPI_MOSI  10 // GPIO 10, SPI_MOSI
+#define SPI_MISO  9 // GPIO 9, SPI_MISO
+#define P25  25 // GPIO 25, P25
+#define GPCLK0  4 // GPIO 4
+
+// user schema for PSX
+#define PSX_SEL  SPI_CE0
+#define PSX_CLK  SPI_SCLK
+#define PSX_CMD  SPI_MOSI
+#define PSX_DAT  SPI_MISO
+#define PSX_ACK  P25
+#define PSX_ACK_WAIT 8 // usec
 
 void setModePSX( long dly ){
     speed = 244000;
@@ -195,9 +210,9 @@ int test( long dly ){
 int main(int argc, char *argv[])
 {
         int ret = 0;
-
         int i = 0;
-        for ( i = 100; i < 101; ++i ){
+
+        for ( i = 60; i < 61; ++i ){
             printf( "delay_usec_setting = %d\n", i);
             ret = test (i) ;
             if ( 0 != ret )
