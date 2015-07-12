@@ -1,6 +1,7 @@
 #include <wiringPi.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <math.h>
 
 // broadcom gpio schema
 #define SPI_CE0  8 // GPIO8, SPI_CE0
@@ -17,9 +18,9 @@
 #define PSX_DAT  SPI_MISO
 #define PSX_ACK  P25
 
-#define PSX_ACK_WAIT 60 // usec
+#define PSX_ACK_WAIT 8 // usec
 
-#define T 32 // 1s / 256 KHz for 1 bit
+static useconds_t T =  4; // 1s / 256 KHz for 1 bit
 
 char ioByte( char obyte ){
     char ibyte = 0x00;
@@ -57,6 +58,7 @@ char ioByte( char obyte ){
 void ioByteArray( char arr[], char ret[], int len ){
     int i;
     printf( "ioByteArray() T = %ld\n", T );
+    printf( "estimate (T+ACK) time = %lf s\n", (T*8 + PSX_ACK_WAIT) * len / 1000000.0  );
     digitalWrite(PSX_CLK, HIGH);
     digitalWrite( PSX_SEL, LOW );
     usleep( T/4 );
@@ -97,6 +99,14 @@ void getID(){
     puts("");
 }
 
+void test(){
+    int i = 0;
+    for ( i = 0; i < 1; ++i ){
+        T = T * pow(2,i);
+        getID();
+    }
+}
+
 int main(int argc, char *argv[])
 {
     // init wiringPi
@@ -107,7 +117,6 @@ int main(int argc, char *argv[])
     pinMode (PSX_DAT, INPUT);
     pinMode (PSX_ACK, INPUT);
 
-    getID();
-
+    test();
     return 0;
 }
