@@ -81,7 +81,7 @@ static uint16_t xfr_delay;
 #define PSX_ACK  P25
 
 #define PSX_SPI_SPEED 244000 // Hz
-#define PSX_SPI_BYTE_XFR_DELAY 60 // usec
+#define PSX_SPI_BYTE_XFR_DELAY 6 // usec
 #define PSX_SPI_BITS_PER_WORD 8 // usec
 #define PSX_ACK_WAIT 8 // usec
 
@@ -97,56 +97,15 @@ static void print_buffer( uint8_t rx[], int len){
     puts("");
 }
 
-/* static uint8_t tx_getID[] */
-
-static void transfer(int fd)
-{
-
-    int ret;
-    uint8_t tx[128 + 10] = {
-        0x81, // Access mem card
-        'R',  // 0x52, // send read command
-        /* 'S',  // 0x53, // get ID */
-        0x01, // >> mem card id 1 ??
-        0x02, // >> mem card id 2 ??
-        0x00, // Address MSB
-        0x00, // Address LSB
-        0x03, // >> mem card ACK1
-        0x04, // >> mem card ACK2
-        0x05, // >> Confirm MSB
-        0x06 // >> Confirm LSB
-    };
-    uint8_t rx[ARRAY_SIZE(tx)] = {0, };
-    memset(rx, 0xFF, sizeof rx); // DEBUG
-    struct spi_ioc_transfer tr = {
-        .tx_buf = (unsigned long)tx,
-        .rx_buf = (unsigned long)rx,
-        .len = ARRAY_SIZE(tx),
-        .delay_usecs = xfr_delay,
-        .speed_hz = speed,
-        .bits_per_word = bits,
-    };
-
-    // soft reverse bit order
-    if ( lsb_first ) {
-        printf("lsb trans tx\n");
-        reverseBitsInArray(tx, ARRAY_SIZE(tx));
-    }
-
-    ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr);
-    if (ret < 1)
-        pabort("can't send spi message");
-
-    printf("ret: %d\n", ret);
-
-    // soft reverse bit order rx
-    if (lsb_first) {
-        printf("lsb trans rx\n");
-        reverseBitsInArray(rx, ARRAY_SIZE(tx));
-    }
-
-    print_buffer( rx, ARRAY_SIZE(tx) );
-
+static void printxfr( struct spi_ioc_transfer xfr ){
+    printf("spi_ioc_transfer: %p\n", &xfr);
+    printf(" .tx_buf: %p\n", xfr.tx_buf);
+    printf(" .rx_buf: %p\n", xfr.rx_buf);
+    printf(" .len: %ld\n", xfr.len);
+    printf(" .speed_hz: %d\n", xfr.speed_hz);
+    printf(" .bits_per_word: %d\n", xfr.bits_per_word);
+    printf(" .delay_usecs: %d\n", xfr.delay_usecs);
+    printf(" .cs_change: %d\n", xfr.cs_change);
 }
 
 static void spi_dump_stat(int fd)
@@ -176,13 +135,15 @@ static void spi_dump_stat(int fd)
             mode, bits, lsb ? "(lsb first) " : "", speed);
 }
 
-static void psx_spi_set_mode( int fd ){
+static void psx_spi_setup( int fd ){
     int ret;
 
     speed = 244000;
     mode |= SPI_CPHA;
     mode |= SPI_CPOL;
+    bits = PSX_SPI_BITS_PER_WORD ;
     xfr_delay = PSX_SPI_BYTE_XFR_DELAY;
+    lsb_first = 1;  // HACK, spi-bcm2708 (driver?) do not support set lsb first.
 
     ret = ioctl(fd, SPI_IOC_WR_MODE, &mode);
     if (ret == -1)
@@ -191,7 +152,6 @@ static void psx_spi_set_mode( int fd ){
     /* ret = ioctl(fd, SPI_IOC_WR_LSB_FIRST, &mode); */
     /* if (ret == -1) */
     /* 	pabort("can't set LSB first"); */
-    lsb_first = 1;  // HACK, spi-bcm2708 (driver?) do not support set lsb first.
 
     ret = ioctl(fd, SPI_IOC_WR_BITS_PER_WORD, &bits);
     if (ret == -1)
@@ -202,7 +162,8 @@ static void psx_spi_set_mode( int fd ){
         pabort("can't set max speed hz");
 }
 
-static void psx_spi_do_msg(int fd, char *cmd, char *dat, unsigned long len){
+
+static void psx_spi_do_msg(int fd, char *cmd, char *dat, unsigned int len){
     /*
      *  struct spi_ioc_transfer - describes a single SPI transfer 
      *  @tx_buf: Holds pointer to userspace buffer with transmit data, or null. 
@@ -220,23 +181,31 @@ static void psx_spi_do_msg(int fd, char *cmd, char *dat, unsigned long len){
     
     xfer.tx_buf = (unsigned long) cmd;
     xfer.rx_buf = (unsigned long) dat;
-    xfer.len = len;
+    xfer.len = ARRAY_SIZE(cmd); // array size cmd?
     /* xfer.speed_hz = PSX_SPI_SPEED; */
     /* xfer.bits_per_word = PSX_SPI_BITS_PER_WORD; */
     /* xfer.delay_usecs = PSX_SPI_BYTE_XFR_DELAY; */
     /* xfer.cs_change = 0; */
 
-    printf("len: %d", len);
+    printxfr( xfer );
 
     int status;
 
-    if ( lsb_first )
+    if ( lsb_first ){
+        printf("lsb trans cmd\n");
         reverseBitsInArray(cmd, len);  // soft reverse bit order
+    }
 
-    status = ioctl(fd, SPI_IOC_MESSAGE(1), xfer);
+    status = ioctl(fd, SPI_IOC_MESSAGE(1), &xfer);
 
     if (status < 0) {
         perror("SPI_IOC_MESSAGE");
+    }
+    
+    // soft reverse bit order rx
+    if (lsb_first) {
+        printf("lsb trans dat\n");
+        reverseBitsInArray(dat, ARRAY_SIZE(dat));
     }
 }
 
@@ -263,7 +232,7 @@ static int psx_read_id( const char* spi_device ){
     if (fd < 0)
         pabort("psx_read_id() can't open device");
 
-    psx_spi_set_mode(fd);
+    psx_spi_setup(fd);
     spi_dump_stat(fd);
     psx_spi_do_msg(fd, cmd, dat, ARRAY_SIZE(cmd) );
 
