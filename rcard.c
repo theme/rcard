@@ -291,8 +291,18 @@ static int psx_read( const char* spi_device, unsigned long addr, unsigned long r
 
     close(fd);
 
-    printf("PSX read data at %ld, len %ld\n", addr, read_len);
-    print_buffer(dat+10, read_len);
+
+    printf("PSX read() at 0x%lx, len %ld\n, all buf:\n", addr, read_len);
+    print_buffer(dat, len);
+
+    // MSB xor LSB xor DATA
+    uint8_t chk = MSB ^ LSB;
+    int i;
+    for (i = 0 ; i < read_len; ++i  ){
+        chk ^=  dat[10 + i];
+    }
+    printf("checksum %x, returned %x\n", chk, dat[len-2]);
+
     return ret;
 }
 
@@ -309,6 +319,7 @@ static int psx_read_frame( const char* spi_device, unsigned long block, unsigned
         abort();
     }
 
+    printf("psx_read_frame() block %ld, frame %ld\n", block, frame);
     psx_read( spi_device, block * 8 * 1024 + frame * 128, 128 );
 }
 
@@ -317,7 +328,7 @@ int main(int argc, char *argv[])
     int ret = 0;
 
     /* ret = psx_get_id( device ) ; */
-    /* ret = psx_read( device, 0x00, 64) ; */
+    /* ret = psx_read( device, 0x00, 256) ; */
     ret = psx_read_frame( device, 0, 3) ;
 
     return ret;
