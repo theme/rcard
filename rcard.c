@@ -192,7 +192,7 @@ static void psx_spi_do_msg(int fd, char *cmd, char *dat, unsigned int len){
     int status;
 
     if ( lsb_first ){
-        printf("lsb trans cmd\n");
+        /* printf("lsb trans cmd\n"); */
         reverseBitsInArray(cmd, len);  // soft reverse bit order
     }
 
@@ -204,7 +204,7 @@ static void psx_spi_do_msg(int fd, char *cmd, char *dat, unsigned int len){
     
     // soft reverse bit order rx
     if (lsb_first) {
-        printf("lsb trans dat\n");
+        /* printf("lsb trans dat\n"); */
         reverseBitsInArray(dat, len);
     }
 }
@@ -286,13 +286,13 @@ static int psx_read( const char* spi_device, unsigned long addr, unsigned long r
         pabort("psx_get_id() can't open device");
 
     psx_spi_setup(fd);
-    spi_dump_stat(fd);
+    /* spi_dump_stat(fd); */
     psx_spi_do_msg(fd, cmd, dat, len );
 
     close(fd);
 
 
-    printf("PSX read() at 0x%lx, len %ld\n, all buf:\n", addr, read_len);
+    printf("psx_read() at 0x%lx, len %ld\n", addr, read_len);
     print_buffer(dat, len);
 
     // MSB xor LSB xor DATA
@@ -329,7 +329,10 @@ int main(int argc, char *argv[])
 
     /* ret = psx_get_id( device ) ; */
     /* ret = psx_read( device, 0x00, 256) ; */
-    ret = psx_read_frame( device, 0, 3) ;
+    int f = 0;
+    for ( f = 0; f < 16; ++f) {
+        ret = psx_read_frame( device, 1, f) ;
+    }
 
     return ret;
 }
