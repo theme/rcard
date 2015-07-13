@@ -97,7 +97,7 @@ static void print_buffer( uint8_t rx[], int len){
     puts("");
 }
 
-static void printxfr( struct spi_ioc_transfer xfr ){
+static void print_xfr( struct spi_ioc_transfer xfr ){
     printf("spi_ioc_transfer: %p\n", &xfr);
     printf(" .tx_buf: %p\n", xfr.tx_buf);
     printf(" .rx_buf: %p\n", xfr.rx_buf);
@@ -187,7 +187,7 @@ static void psx_spi_do_msg(int fd, char *cmd, char *dat, unsigned int len){
     /* xfer.delay_usecs = PSX_SPI_BYTE_XFR_DELAY; */
     /* xfer.cs_change = 0; */
 
-    printxfr( xfer );
+    /* print_xfr( xfer ); */
 
     int status;
 
@@ -292,8 +292,24 @@ static int psx_read( const char* spi_device, unsigned long addr, unsigned long r
     close(fd);
 
     printf("PSX read data at %ld, len %ld\n", addr, read_len);
-    print_buffer(dat+10, len );
+    print_buffer(dat+10, read_len);
     return ret;
+}
+
+static int psx_read_frame( const char* spi_device, unsigned long block, unsigned long frame){
+    /* block 0 - 15 , each 8KB*/
+    /* frame 0 - 63 , each 128 B */ 
+    if ( ! (block < 16) ){
+        printf("psx_read_frame() not a block No. : %ld", block);
+        abort();
+    }
+
+    if ( ! (frame < 64) ){
+        printf("psx_read_frame() not a frame No. : %ld", frame);
+        abort();
+    }
+
+    psx_read( spi_device, block * 8 * 1024 + frame * 128, 128 );
 }
 
 int main(int argc, char *argv[])
@@ -301,7 +317,8 @@ int main(int argc, char *argv[])
     int ret = 0;
 
     /* ret = psx_get_id( device ) ; */
-    ret = psx_read( device, 0x00, 64) ;
+    /* ret = psx_read( device, 0x00, 64) ; */
+    ret = psx_read_frame( device, 0, 3) ;
 
     return ret;
 }
