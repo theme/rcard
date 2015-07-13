@@ -15,6 +15,8 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
 #include <getopt.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
@@ -76,6 +78,7 @@ static uint16_t delay_usec_setting;
 #define PSX_CMD  SPI_MOSI
 #define PSX_DAT  SPI_MISO
 #define PSX_ACK  P25
+
 #define PSX_ACK_WAIT 8 // usec
 
 void setModePSX( long dly ){
@@ -108,16 +111,17 @@ static void transfer(int fd)
         0x81, // Access mem card
         'R',  // 0x52, // send read command
         /* 'S',  // 0x53, // get ID */
-        0x00, // >> mem card id 1 ??
-        0x00, // >> mem card id 2 ??
+        0x01, // >> mem card id 1 ??
+        0x02, // >> mem card id 2 ??
         0x00, // Address MSB
         0x00, // Address LSB
-        0x00, // >> mem card ACK1
-        0x00, // >> mem card ACK2
-        0x00, // >> Confirm MSB
-        0x00 // >> Confirm LSB
+        0x03, // >> mem card ACK1
+        0x04, // >> mem card ACK2
+        0x05, // >> Confirm MSB
+        0x06 // >> Confirm LSB
     };
     uint8_t rx[ARRAY_SIZE(tx)] = {0, };
+    memset(rx, 0xFF, sizeof rx); // DEBUG
     struct spi_ioc_transfer tr = {
         .tx_buf = (unsigned long)tx,
         .rx_buf = (unsigned long)rx,
@@ -149,6 +153,108 @@ static void transfer(int fd)
 
 }
 
+static void do_read(int fd, int len)
+{
+    unsigned char   buf[32], *bp;
+    int     status;
+
+    /* read at least 2 bytes, no more than 32 */
+    if (len < 2)
+        len = 2;
+    else if (len > sizeof(buf))
+        len = sizeof(buf);
+    memset(buf, 0, sizeof buf);
+
+    status = read(fd, buf, len);
+    if (status < 0) {
+        perror("read");
+        return;
+    }
+    if (status != len) {
+        fprintf(stderr, "short read\n");
+        return;
+    }
+
+    printf("read(%2d, %2d): %02x %02x,", len, status,
+            buf[0], buf[1]);
+    status -= 2;
+    bp = buf + 2;
+    while (status-- > 0)
+        printf(" %02x", *bp++);
+    printf("\n");
+}
+
+static void do_msg(int fd, int len)
+{
+    struct spi_ioc_transfer xfer[2];
+    unsigned char       buf[32], *bp;
+    int         status;
+
+    memset(xfer, 0, sizeof xfer);
+    memset(buf, 0, sizeof buf);
+
+    if (len > sizeof buf)
+        len = sizeof buf;
+
+    buf[0] = 0x81;
+    buf[1] = 'R';
+    xfer[0].tx_buf = (unsigned long) buf;
+    xfer[0].rx_buf = (unsigned long) buf;
+    xfer[0].len = len;
+    xfer[0].delay_usecs = delay_usec_setting;
+    xfer[0].speed_hz = speed;
+    xfer[0].bits_per_word = bits;
+
+    /* xfer[1].rx_buf = (unsigned long) buf; */
+    /* xfer[1].len = len; */
+    /* xfer[1].delay_usecs = delay_usec_setting; */
+    /* xfer[1].speed_hz = speed; */
+    /* xfer[1].bits_per_word = bits; */
+
+    // soft reverse bit order
+    if ( lsb_first ) {
+        printf("lsb trans tx\n");
+        reverseBitsInArray(buf, ARRAY_SIZE(buf));
+    }
+
+    status = ioctl(fd, SPI_IOC_MESSAGE(1), xfer);
+    if (status < 0) {
+        perror("SPI_IOC_MESSAGE");
+        return;
+    }
+
+    printf("response(%2d, %2d): ", len, status);
+    for (bp = buf; len; len--)
+        printf(" %02x", *bp++);
+    printf("\n");
+}
+
+static void dumpstat(const char *name, int fd)
+{
+    __u8    lsb=0, bits=0;
+    __u32   mode=0, speed=0;
+
+    if (ioctl(fd, SPI_IOC_RD_MODE, &mode) < 0) {
+        perror("SPI rd_mode");
+        return;
+    }
+
+    if (ioctl(fd, SPI_IOC_RD_LSB_FIRST, &lsb) < 0) {
+        perror("SPI rd_lsb_fist");
+        return;
+    }
+    if (ioctl(fd, SPI_IOC_RD_BITS_PER_WORD, &bits) < 0) {
+        perror("SPI bits_per_word");
+        return;
+    }
+    if (ioctl(fd, SPI_IOC_RD_MAX_SPEED_HZ, &speed) < 0) {
+        perror("SPI max_speed_hz");
+        return;
+    }
+
+    printf("%s: spi mode 0x%x, %d bits %sper word, %d Hz max\n",
+            name, mode, bits, lsb ? "(lsb first) " : "", speed);
+}
 
 int test( long dly ){
     int ret = 0;
@@ -201,7 +307,10 @@ int test( long dly ){
     printf("bits per word: %d\n", bits);
     printf("max speed: %d Hz (%d KHz)\n", speed, speed/1000);
 
-    transfer(fd);
+    dumpstat(device, fd);
+
+    /* transfer(fd); */
+    do_msg(fd, 10);
 
     close(fd);
     return ret;
@@ -209,15 +318,15 @@ int test( long dly ){
 
 int main(int argc, char *argv[])
 {
-        int ret = 0;
-        int i = 0;
+    int ret = 0;
+    int i = 0;
 
-        for ( i = 60; i < 61; ++i ){
-            printf( "delay_usec_setting = %d\n", i);
-            ret = test (i) ;
-            if ( 0 != ret )
-                break;
-        }
+    for ( i = 60; i < 61; ++i ){
+        printf( "delay_usec_setting = %d\n", i);
+        ret = test (i) ;
+        if ( 0 != ret )
+            break;
+    }
 
-        return ret;
+    return ret;
 }
