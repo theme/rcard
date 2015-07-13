@@ -182,10 +182,10 @@ static void psx_spi_do_msg(int fd, char *cmd, char *dat, unsigned int len){
     xfer.tx_buf = (unsigned long) cmd;
     xfer.rx_buf = (unsigned long) dat;
     xfer.len = len;
-    xfer.speed_hz = PSX_SPI_SPEED;
-    xfer.bits_per_word = PSX_SPI_BITS_PER_WORD;
-    xfer.delay_usecs = PSX_SPI_BYTE_XFR_DELAY;
-    xfer.cs_change = 0;
+    /* xfer.speed_hz = PSX_SPI_SPEED; */
+    /* xfer.bits_per_word = PSX_SPI_BITS_PER_WORD; */
+    /* xfer.delay_usecs = PSX_SPI_BYTE_XFR_DELAY; */
+    /* xfer.cs_change = 0; */
 
     printxfr( xfer );
 
@@ -209,8 +209,12 @@ static void psx_spi_do_msg(int fd, char *cmd, char *dat, unsigned int len){
     }
 }
 
-static int psx_read_id( const char* spi_device ){
-    /* Only supported by original SONY memcards ! */
+static int psx_get_id( const char* spi_device ){
+    /* This command is supported only by original Sony memory cards.
+     * Not sure if all sony cards are responding with the same values,
+     * and what meaning they have,
+     * might be number of sectors (0400h) and sector size (0080h) or whatever.
+     */
     uint8_t cmd[] = {
         /* Send Reply Comment*/
         0x81 ,// N/A   Memory Card Access (unlike 01h=Controller access), dummy response
@@ -232,7 +236,7 @@ static int psx_read_id( const char* spi_device ){
 
     fd = open(spi_device, O_RDWR);
     if (fd < 0)
-        pabort("psx_read_id() can't open device");
+        pabort("psx_get_id() can't open device");
 
     psx_spi_setup(fd);
     spi_dump_stat(fd);
@@ -240,7 +244,55 @@ static int psx_read_id( const char* spi_device ){
 
     close(fd);
 
+    printf("PSX get id\n");
     print_buffer(dat, ARRAY_SIZE(dat) );
+    return ret;
+}
+
+static int psx_read( const char* spi_device, unsigned long addr, unsigned long read_len ){
+    unsigned long len = read_len + 12;
+    uint8_t LSB = 0xFF & addr;
+    uint8_t MSB = 0xFF & (addr >> 8);
+    uint8_t *cmd = calloc( len, sizeof (uint8_t) );
+    uint8_t *dat= calloc( len, sizeof (uint8_t) );
+    /* Send Reply Comment */
+    cmd[0] = 0x81; // N/A   Memory Card Access (unlike 01h=Controller access), dummy response
+    cmd[1] = 0x52; // FLAG  Send Read Command (ASCII "R"), Receive FLAG Byte
+    cmd[2] = 0x00; // 5Ah   Receive Memory Card ID1
+    cmd[3] = 0x00; // 5Dh   Receive Memory Card ID2
+    cmd[4] = MSB ; // (00h) Send Address MSB  ;\sector number (0..3FFh)
+    cmd[5] = LSB ; // (pre) Send Address LSB  ;/
+    /* [6]   0x00     5Ch   Receive Command Acknowledge 1  ;<-- late /ACK after this byte-pair */
+    /* [7]   0x00     5Dh   Receive Command Acknowledge 2 */
+    /* [8]   0x00     MSB   Receive Confirmed Address MSB */
+    /* [9]   0x00     LSB   Receive Confirmed Address LSB */
+    /* [10]   0x00    ...   Receive Data Sector (128 bytes) |)}># */
+    /* [len-2]   0x00 CHK   Receive Checksum (MSB xor LSB xor Data bytes) */
+    /* [len-1]   0x00 47h   Receive Memory End Byte (should be always 47h="G"=Good for Read) */
+    /* Non-sony cards additionally send eight 5Ch bytes after the end flag. */
+    /* When sending an invalid sector number, 
+     * original Sony memory cards respond with FFFFh as Confirmed Address 
+     * (and do then abort the transfer without sending any data, checksum, or end flag), 
+     * third-party memory cards typically respond with the sector number ANDed with 3FFh
+     * (and transfer the data for that adjusted sector number).
+     */
+    int ret = 0;
+    int fd;
+
+    memset(dat, 0xff, len);     // DEBUG
+
+    fd = open(spi_device, O_RDWR);
+    if (fd < 0)
+        pabort("psx_get_id() can't open device");
+
+    psx_spi_setup(fd);
+    spi_dump_stat(fd);
+    psx_spi_do_msg(fd, cmd, dat, len );
+
+    close(fd);
+
+    printf("PSX read data at %ld, len %ld\n", addr, read_len);
+    print_buffer(dat+10, len );
     return ret;
 }
 
@@ -248,7 +300,8 @@ int main(int argc, char *argv[])
 {
     int ret = 0;
 
-    ret = psx_read_id( device ) ;
+    /* ret = psx_get_id( device ) ; */
+    ret = psx_read( device, 0x00, 64) ;
 
     return ret;
 }
