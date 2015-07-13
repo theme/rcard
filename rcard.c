@@ -181,11 +181,11 @@ static void psx_spi_do_msg(int fd, char *cmd, char *dat, unsigned int len){
     
     xfer.tx_buf = (unsigned long) cmd;
     xfer.rx_buf = (unsigned long) dat;
-    xfer.len = ARRAY_SIZE(cmd); // array size cmd?
-    /* xfer.speed_hz = PSX_SPI_SPEED; */
-    /* xfer.bits_per_word = PSX_SPI_BITS_PER_WORD; */
-    /* xfer.delay_usecs = PSX_SPI_BYTE_XFR_DELAY; */
-    /* xfer.cs_change = 0; */
+    xfer.len = len;
+    xfer.speed_hz = PSX_SPI_SPEED;
+    xfer.bits_per_word = PSX_SPI_BITS_PER_WORD;
+    xfer.delay_usecs = PSX_SPI_BYTE_XFR_DELAY;
+    xfer.cs_change = 0;
 
     printxfr( xfer );
 
@@ -205,7 +205,7 @@ static void psx_spi_do_msg(int fd, char *cmd, char *dat, unsigned int len){
     // soft reverse bit order rx
     if (lsb_first) {
         printf("lsb trans dat\n");
-        reverseBitsInArray(dat, ARRAY_SIZE(dat));
+        reverseBitsInArray(dat, len);
     }
 }
 
@@ -227,6 +227,8 @@ static int psx_read_id( const char* spi_device ){
     uint8_t dat[ARRAY_SIZE(cmd)] = {0, };
     int ret = 0;
     int fd;
+
+    memset(dat, 0xff, ARRAY_SIZE(cmd));     // DEBUG
 
     fd = open(spi_device, O_RDWR);
     if (fd < 0)
