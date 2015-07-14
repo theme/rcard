@@ -17,11 +17,38 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <getopt.h>
+#include <stdint.h>
+#include <time.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/time.h>
 #include <fcntl.h>
+
+#include "pigpio.h"
+
 #include <sys/ioctl.h>
 #include <linux/types.h>
 #include <linux/spi/spidev.h>
+
+// broadcom gpio schema
+#define SPI_CE0  8 // GPIO8, SPI_CE0
+#define SPI_SCLK  11 // GPIO 11, SPI_SCLK
+#define SPI_MOSI  10 // GPIO 10, SPI_MOSI
+#define SPI_MISO  9 // GPIO 9, SPI_MISO
+#define P25  25 // GPIO 25, P25
+#define GPCLK0  4 // GPIO 4
+
+// user schema for PSX
+#define PSX_SEL  SPI_CE0
+#define PSX_CLK  SPI_SCLK
+#define PSX_CMD  SPI_MOSI
+#define PSX_DAT  SPI_MISO
+#define PSX_ACK  P25
+
+#define PSX_SPI_SPEED 244000 // Hz
+#define PSX_SPI_BYTE_XFR_DELAY 6 // usec
+#define PSX_SPI_BITS_PER_WORD 8 // usec
+#define PSX_ACK_WAIT 8 // usec
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
@@ -60,30 +87,11 @@ static void pabort(const char *s)
 
 static const char *device = "/dev/spidev0.0";
 static uint8_t mode;
-static uint8_t lsb_first = 0;
+static uint8_t lsb_first = 1;
 static uint8_t bits = 8;
 static uint32_t speed = 244000;
 static uint16_t xfr_delay;
 
-// broadcom gpio schema
-#define SPI_CE0  8 // GPIO8, SPI_CE0
-#define SPI_SCLK  11 // GPIO 11, SPI_SCLK
-#define SPI_MOSI  10 // GPIO 10, SPI_MOSI
-#define SPI_MISO  9 // GPIO 9, SPI_MISO
-#define P25  25 // GPIO 25, P25
-#define GPCLK0  4 // GPIO 4
-
-// user schema for PSX
-#define PSX_SEL  SPI_CE0
-#define PSX_CLK  SPI_SCLK
-#define PSX_CMD  SPI_MOSI
-#define PSX_DAT  SPI_MISO
-#define PSX_ACK  P25
-
-#define PSX_SPI_SPEED 244000 // Hz
-#define PSX_SPI_BYTE_XFR_DELAY 6 // usec
-#define PSX_SPI_BITS_PER_WORD 8 // usec
-#define PSX_ACK_WAIT 8 // usec
 
 static void print_buffer( uint8_t rx[], int len){
     int ret;
@@ -281,16 +289,36 @@ static int psx_read( const char* spi_device, unsigned long addr, unsigned long r
 
     memset(dat, 0xff, len);     // DEBUG
 
-    fd = open(spi_device, O_RDWR);
-    if (fd < 0)
-        pabort("psx_get_id() can't open device");
-
-    psx_spi_setup(fd);
+    /* fd = open(spi_device, O_RDWR); */
+    /* if (fd < 0) */
+    /*     pabort("psx_get_id() can't open device"); */
+    /*  */
+    /* psx_spi_setup(fd); */
     /* spi_dump_stat(fd); */
-    psx_spi_do_msg(fd, cmd, dat, len );
+    /* psx_spi_do_msg(fd, cmd, dat, len ); */
 
-    close(fd);
 
+    /* close(fd); */
+
+    // pigpio way
+    unsigned flag = 0x03 | (0x01 << 2) ;
+    int pigpio_handle = spiOpen(0, 244000, flag);
+    // do mesg
+
+    if ( lsb_first ){
+        /* printf("lsb trans cmd\n"); */
+        reverseBitsInArray(cmd, len);  // soft reverse bit order
+    }
+    /* spiXfer(pigpio_handle, cmd, dat, len); */
+    spiWrite(pigpio_handle, cmd, len);
+
+    if ( lsb_first ){
+        /* printf("lsb trans cmd\n"); */
+        reverseBitsInArray(dat, len);  // soft reverse bit order
+    }
+
+    // close
+    spiClose(pigpio_handle);
 
     printf("psx_read() at 0x%lx, len %ld\n", addr, read_len);
     print_buffer(dat, len);
@@ -327,6 +355,9 @@ int main(int argc, char *argv[])
 {
     int ret = 0;
 
+    if( PI_INIT_FAILED == gpioInitialise() ){
+        pabort("init pigpio failed");
+    }
     /* ret = psx_get_id( device ) ; */
     /* ret = psx_read( device, 0x00, 256) ; */
     int f = 0;
