@@ -1,11 +1,20 @@
+CFLAGS=-g
+# LDFLAGS= -lwiringPi -lm
+LDFLAGS= -lpigpio -lrt -lpthread
+
+read: rcard
+	sudo ./$<
+
+test: spidev_test
+	./$<
+
+.PHONY: test read clean up
+rcard: rcard.o
+spidev_test: spidev_test.o
+clean:
+	find . -maxdepth 1 -type f -perm /111 -exec rm {} \;
+	find . -maxdepth 1 -type f -name "*.o" -exec rm {} \;
+
 up:
-	# scp rcardwp.c pi@localpi:/home/pi/gpio/
-	# scp rcardwpspi.c pi@localpi:/home/pi/gpio/
 	scp rcard.c pi@localpi:/home/pi/gpio/
-	# scp spidev_test.c pi@localpi:/home/pi/gpio/
-	# scp ./py/rcard.py pi@localpi:/home/pi/gpio/py/
-
-down:
-	# scp pi@localpi:/home/pi/gpio/rcardwp.c rcardwp.c
-
-.PHONY:up
+	scp makefile pi@localpi:/home/pi/gpio/
