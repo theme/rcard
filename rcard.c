@@ -88,9 +88,9 @@ static void pabort(const char *s)
 static const char *device = "/dev/spidev0.0";
 static uint8_t mode;
 static uint8_t lsb_first = 1;
-static uint8_t bits = 8;
-static uint32_t speed = 244000;
-static uint16_t xfr_delay;
+static uint8_t bits = PSX_SPI_BITS_PER_WORD;
+static uint32_t speed = PSX_SPI_SPEED;
+static uint16_t xfr_delay = PSX_SPI_BYTE_XFR_DELAY;
 
 
 static void print_buffer( uint8_t rx[], int len){
