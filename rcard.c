@@ -80,8 +80,8 @@ static uint16_t xfr_delay;
 #define PSX_DAT  SPI_MISO
 #define PSX_ACK  P25
 
-#define PSX_SPI_SPEED 244000 // Hz
-#define PSX_SPI_BYTE_XFR_DELAY 6 // usec
+#define PSX_SPI_SPEED 128000 // Hz
+#define PSX_SPI_BYTE_XFR_DELAY 8 // usec
 #define PSX_SPI_BITS_PER_WORD 8 // usec
 #define PSX_ACK_WAIT 8 // usec
 
@@ -138,7 +138,7 @@ static void spi_dump_stat(int fd)
 static void psx_spi_setup( int fd ){
     int ret;
 
-    speed = 244000;
+    speed = PSX_SPI_SPEED;
     mode |= SPI_CPHA;
     mode |= SPI_CPOL;
     bits = PSX_SPI_BITS_PER_WORD ;
@@ -182,10 +182,10 @@ static void psx_spi_do_msg(int fd, char *cmd, char *dat, unsigned int len){
     xfer.tx_buf = (unsigned long) cmd;
     xfer.rx_buf = (unsigned long) dat;
     xfer.len = len;
-    /* xfer.speed_hz = PSX_SPI_SPEED; */
-    /* xfer.bits_per_word = PSX_SPI_BITS_PER_WORD; */
-    /* xfer.delay_usecs = PSX_SPI_BYTE_XFR_DELAY; */
-    /* xfer.cs_change = 0; */
+    xfer.speed_hz = PSX_SPI_SPEED;
+    xfer.bits_per_word = PSX_SPI_BITS_PER_WORD;
+    xfer.delay_usecs = PSX_SPI_BYTE_XFR_DELAY;
+    xfer.cs_change = 0;
 
     /* print_xfr( xfer ); */
 
@@ -286,7 +286,7 @@ static int psx_read( const char* spi_device, unsigned long addr, unsigned long r
         pabort("psx_get_id() can't open device");
 
     psx_spi_setup(fd);
-    /* spi_dump_stat(fd); */
+    spi_dump_stat(fd);
     psx_spi_do_msg(fd, cmd, dat, len );
 
     close(fd);
@@ -328,10 +328,10 @@ int main(int argc, char *argv[])
     int ret = 0;
 
     /* ret = psx_get_id( device ) ; */
-    /* ret = psx_read( device, 0x00, 256) ; */
+    /* ret = psx_read( device, 0x00, 16) ; */
     int f = 0;
-    for ( f = 0; f < 16; ++f) {
-        ret = psx_read_frame( device, 1, f) ;
+    for ( f = 0; f < 1; ++f) {
+        ret = psx_read_frame( device, 2, f) ;
     }
 
     return ret;
