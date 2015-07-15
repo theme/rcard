@@ -25,6 +25,26 @@
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
+// broadcom gpio schema
+#define SPI_CE0  8 // GPIO8, SPI_CE0
+#define SPI_SCLK  11 // GPIO 11, SPI_SCLK
+#define SPI_MOSI  10 // GPIO 10, SPI_MOSI
+#define SPI_MISO  9 // GPIO 9, SPI_MISO
+#define P25  25 // GPIO 25, P25
+#define GPCLK0  4 // GPIO 4
+
+// user schema for PSX
+#define PSX_SEL  SPI_CE0
+#define PSX_CLK  SPI_SCLK
+#define PSX_CMD  SPI_MOSI
+#define PSX_DAT  SPI_MISO
+#define PSX_ACK  P25
+
+#define PSX_SPI_SPEED 128000 // Hz
+#define PSX_SPI_BYTE_XFR_DELAY 16 // usec
+#define PSX_SPI_BITS_PER_WORD 8 // usec
+#define PSX_ACK_WAIT 8 // usec
+
 // Reverse table is used because we don't know how to change bit-order on SPI settings
 static const uint8_t BitReverseTable256[256] = {
     0x00, 0x80, 0x40, 0xC0, 0x20, 0xA0, 0x60, 0xE0, 0x10, 0x90, 0x50, 0xD0, 0x30, 0xB0, 0x70, 0xF0,
@@ -60,30 +80,10 @@ static void pabort(const char *s)
 
 static const char *device = "/dev/spidev0.0";
 static uint8_t mode;
-static uint8_t lsb_first = 0;
-static uint8_t bits = 8;
-static uint32_t speed = 244000;
-static uint16_t xfr_delay;
-
-// broadcom gpio schema
-#define SPI_CE0  8 // GPIO8, SPI_CE0
-#define SPI_SCLK  11 // GPIO 11, SPI_SCLK
-#define SPI_MOSI  10 // GPIO 10, SPI_MOSI
-#define SPI_MISO  9 // GPIO 9, SPI_MISO
-#define P25  25 // GPIO 25, P25
-#define GPCLK0  4 // GPIO 4
-
-// user schema for PSX
-#define PSX_SEL  SPI_CE0
-#define PSX_CLK  SPI_SCLK
-#define PSX_CMD  SPI_MOSI
-#define PSX_DAT  SPI_MISO
-#define PSX_ACK  P25
-
-#define PSX_SPI_SPEED 128000 // Hz
-#define PSX_SPI_BYTE_XFR_DELAY 8 // usec
-#define PSX_SPI_BITS_PER_WORD 8 // usec
-#define PSX_ACK_WAIT 8 // usec
+static uint8_t lsb_first = 1;
+static uint8_t bits = PSX_SPI_BITS_PER_WORD;
+static uint32_t speed = PSX_SPI_SPEED;
+static uint16_t xfr_delay = PSX_SPI_BYTE_XFR_DELAY;
 
 static void print_buffer( uint8_t rx[], int len){
     int ret;
@@ -176,16 +176,19 @@ static void psx_spi_do_msg(int fd, char *cmd, char *dat, unsigned int len){
      *       before optionally deselecting the device before the next transfer. 
      *  @cs_change: True to deselect device before starting the next transfer. 
      */
-    struct spi_ioc_transfer xfer;
+    struct spi_ioc_transfer xfer[len];
     memset( &xfer, 0, sizeof xfer );
-    
-    xfer.tx_buf = (unsigned long) cmd;
-    xfer.rx_buf = (unsigned long) dat;
-    xfer.len = len;
-    xfer.speed_hz = PSX_SPI_SPEED;
-    xfer.bits_per_word = PSX_SPI_BITS_PER_WORD;
-    xfer.delay_usecs = PSX_SPI_BYTE_XFR_DELAY;
-    xfer.cs_change = 0;
+
+    int j;
+    for (j=0;j < len; ++j){
+        xfer[j].tx_buf = (unsigned long) (cmd +j);
+        xfer[j].rx_buf = (unsigned long) (dat +j);
+        xfer[j].len = 1;
+        xfer[j].speed_hz = PSX_SPI_SPEED;
+        xfer[j].bits_per_word = PSX_SPI_BITS_PER_WORD;
+        xfer[j].delay_usecs = PSX_SPI_BYTE_XFR_DELAY;
+        xfer[j].cs_change = 0;
+    }
 
     /* print_xfr( xfer ); */
 
@@ -195,8 +198,9 @@ static void psx_spi_do_msg(int fd, char *cmd, char *dat, unsigned int len){
         /* printf("lsb trans cmd\n"); */
         reverseBitsInArray(cmd, len);  // soft reverse bit order
     }
+    status = ioctl(fd, SPI_IOC_MESSAGE(len), xfer);
 
-    status = ioctl(fd, SPI_IOC_MESSAGE(1), &xfer);
+    /* status = write(fd, cmd, len); */
 
     if (status < 0) {
         perror("SPI_IOC_MESSAGE");
@@ -329,9 +333,14 @@ int main(int argc, char *argv[])
 
     /* ret = psx_get_id( device ) ; */
     /* ret = psx_read( device, 0x00, 16) ; */
-    int f = 0;
-    for ( f = 0; f < 1; ++f) {
-        ret = psx_read_frame( device, 2, f) ;
+    // for wave pattern scope
+    while(1) {
+        /* ret = psx_read_frame( device, 0, f) ; */
+        /* ret = psx_get_id( device ) ; */
+        int f = 0;
+        for ( f = 0; f < 64; ++f) {
+            ret = psx_read_frame( device, 0, f) ;
+        }
     }
 
     return ret;
