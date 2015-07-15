@@ -45,7 +45,7 @@
 #define PSX_DAT  SPI_MISO
 #define PSX_ACK  P25
 
-#define PSX_SPI_SPEED 244000 // Hz
+#define PSX_SPI_SPEED 128000 // Hz
 #define PSX_SPI_BYTE_XFR_DELAY 6 // usec
 #define PSX_SPI_BITS_PER_WORD 8 // usec
 #define PSX_ACK_WAIT 8 // usec
@@ -169,7 +169,6 @@ static void psx_spi_setup( int fd ){
     if (ret == -1)
         pabort("can't set max speed hz");
 }
-
 
 static void psx_spi_do_msg(int fd, char *cmd, char *dat, unsigned int len){
     /*
@@ -301,16 +300,16 @@ static int psx_read( const char* spi_device, unsigned long addr, unsigned long r
     /* close(fd); */
 
     // pigpio way
-    unsigned flag = 0x03 | (0x01 << 2) ;
-    int pigpio_handle = spiOpen(0, 244000, flag);
+    unsigned flag = 0x03 ;//| (0x01 << 2) ;
+    int pigpio_handle = spiOpen(0, PSX_SPI_SPEED, flag);
     // do mesg
 
     if ( lsb_first ){
         /* printf("lsb trans cmd\n"); */
         reverseBitsInArray(cmd, len);  // soft reverse bit order
     }
-    /* spiXfer(pigpio_handle, cmd, dat, len); */
-    spiWrite(pigpio_handle, cmd, len);
+    spiXfer(pigpio_handle, cmd, dat, len);
+    /* spiWrite(pigpio_handle, cmd, len); */
 
     if ( lsb_first ){
         /* printf("lsb trans cmd\n"); */
@@ -361,7 +360,7 @@ int main(int argc, char *argv[])
     /* ret = psx_get_id( device ) ; */
     /* ret = psx_read( device, 0x00, 256) ; */
     int f = 0;
-    for ( f = 0; f < 16; ++f) {
+    for ( f = 0; f < 64; ++f) {
         ret = psx_read_frame( device, 1, f) ;
     }
 
