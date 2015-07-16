@@ -35,6 +35,6 @@ clean:
 up:
 	scp rcard.c $(RPIADDR)
 	# scp makefile $(RPIADDR)
-	# scp $(KSRC)/drivers/spi/spi-bcm2708.ko $(RPIADDR)/ko.new/
-	# scp $(KSRC)/drivers/spi/spi-bcm2835.ko $(RPIADDR)/ko.new/
+	scp $(KSRC)/drivers/spi/spi-bcm2708.ko $(RPIADDR)/ko.new/
+	scp $(KSRC)/drivers/spi/spi-bcm2835.ko $(RPIADDR)/ko.new/
 

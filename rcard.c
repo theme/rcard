@@ -176,6 +176,52 @@ static void psx_spi_do_msg(int fd, char *cmd, char *dat, unsigned int len){
      *       before optionally deselecting the device before the next transfer. 
      *  @cs_change: True to deselect device before starting the next transfer. 
      */
+    struct spi_ioc_transfer xfer;
+    memset( &xfer, 0, sizeof xfer );
+
+    xfer.tx_buf = (unsigned long) cmd;
+    xfer.rx_buf = (unsigned long) dat;
+    xfer.len = len;
+    xfer.speed_hz = PSX_SPI_SPEED;
+    xfer.bits_per_word = PSX_SPI_BITS_PER_WORD;
+    xfer.delay_usecs = PSX_SPI_BYTE_XFR_DELAY;
+    xfer.cs_change = 0;
+
+    /* print_xfr( xfer ); */
+
+    int status;
+
+    if ( lsb_first ){
+        /* printf("lsb trans cmd\n"); */
+        reverseBitsInArray(cmd, len);  // soft reverse bit order
+    }
+    status = ioctl(fd, SPI_IOC_MESSAGE(1), &xfer);
+
+    /* status = write(fd, cmd, len); */
+
+    if (status < 0) {
+        perror("SPI_IOC_MESSAGE");
+    }
+    
+    // soft reverse bit order rx
+    if (lsb_first) {
+        /* printf("lsb trans dat\n"); */
+        reverseBitsInArray(dat, len);
+    }
+}
+static void psx_spi_do_msg_multi_xfer(int fd, char *cmd, char *dat, unsigned int len){
+    /*
+     *  struct spi_ioc_transfer - describes a single SPI transfer 
+     *  @tx_buf: Holds pointer to userspace buffer with transmit data, or null. 
+     *       If no data is provided, zeroes are shifted out. 
+     *  @rx_buf: Holds pointer to userspace buffer for receive data, or null. 
+     *  @len: Length of tx and rx buffers, in bytes. 
+     *  @speed_hz: Temporary override of the device's bitrate. 
+     *  @bits_per_word: Temporary override of the device's wordsize. 
+     *  @delay_usecs: If nonzero, how long to delay after the last bit transfer 
+     *       before optionally deselecting the device before the next transfer. 
+     *  @cs_change: True to deselect device before starting the next transfer. 
+     */
     struct spi_ioc_transfer xfer[len];
     memset( &xfer, 0, sizeof xfer );
 
