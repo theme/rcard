@@ -130,7 +130,7 @@ void spi_setup() {
     // CPOL - Sets the data clock to be idle when high if set to 1, idle when low if set to 0
     // CPHA - Samples data on the falling edge of the data clock when 1, rising edge when 0
     // SPR1 and SPR0 - Sets the SPI speed, 00 is fastest (4MHz) 11 is slowest (250KHz)
-    SPCR = (0<<SPIE) | (1<<SPE) | (1<<DORD) | (1<< MSTR) | (1<<CPOL) | (0<<CPHA) | (1<<SPR1) | (1<<SPR0)
+    SPCR = (0<<SPIE) | (1<<SPE) | (1<<DORD) | (1<< MSTR) | (1<<CPOL) | (0<<CPHA) | (1<<SPR1) | (1<<SPR0) ;
     
     // SPI data register (SPDR): holds the byte which is about to be shifted out the MOSI line,
     //                           and the data which has just been shifted in the MISO line.
@@ -138,6 +138,8 @@ void spi_setup() {
     
     // SPI status register (SPSR): gets set to 1 when a value is shifted in or out of the SPI.
     clr = SPSR;     // read will cause hardware clear of flags
+    
+    delay(10);
 }
 
 byte spi_xfer_byte(byte cmdByte, unsigned int Delay){
@@ -154,7 +156,7 @@ byte spi_xfer_byte(byte cmdByte, unsigned int Delay){
 }
 
 //Send a command to PlayStation port using SPI
-byte psx_spi_cmd(byte CommandByte, int Delay)
+byte psx_spi_cmd(byte cmdByte, int Delay)
 {
   return spi_xfer_byte( cmdByte, SPI_XFER_BYTE_DELAY_MAX );
 }
@@ -240,11 +242,17 @@ void setup()
 void loop()
 {
     byte ReadByte = 0;
+    // DEBUG
+    while(1){
+      delay(1);
+      psx_read_frame(0,0);
+      Serial.read();
+    }
     //Listen for commands
     if(Serial.available() > 0)
     {
-        /* ReadByte = Serial.read(); */
-        ReadByte = GETID;   // DEBUG
+        ReadByte = Serial.read();
+        //ReadByte = MCREAD;   // DEBUG
 
         switch(ReadByte)
         {
