@@ -90,7 +90,7 @@
 #define PSX_DAT  DataPin
 #define PSX_ACK  AckPin
 
-#define SPI_XFER_BYTE_DELAY_MAX     1500 // micro seconds
+#define SPI_XFER_BYTE_DELAY_MAX     6000 // micro seconds
 #define SPI_ATT_DELAY    16 // micro seconds
 
 // SPI example
@@ -98,6 +98,7 @@
 //If other libraries use SPI from interrupts, they will be prevented from accessing SPI until you call SPI.endTransaction(). Your settings remain in effect for the duration of your "transaction". You should attempt to minimize the time between before you call SPI.endTransaction(), for best compatibility if your program is used together with other libraries which use SPI.
 //With most SPI devices, after SPI.beginTransaction(), you will write the slave select pin LOW, call SPI.transfer() any number of times to transfer data, then write the SS pin HIGH, and finally call SPI.endTransaction().
 
+boolean f_psx_ack = false;
 
 void spi_setup() {
     // junk clr variable
@@ -138,7 +139,9 @@ void spi_setup() {
     
     // SPI status register (SPSR): gets set to 1 when a value is shifted in or out of the SPI.
     clr = SPSR;     // read will cause hardware clear of flags
-    
+
+    // ISR flag: init : no ack received yet
+    f_psx_ack = false;
     delay(10);
 }
 
@@ -148,17 +151,22 @@ byte spi_xfer_byte(byte cmdByte, unsigned int Delay){
     while (!(SPSR & (1<<SPIF))) // Poll for the end of the transmission
     {
     };
-    while( digitalRead(PSX_ACK) && Delay > 0 ) // Poll for the ACK signal from the Memory Card
+    while( ! f_psx_ack && Delay > 0 ) // Poll for the ACK signal from the Memory Card
     {
         Delay--;
         delayMicroseconds(1);
     }
-    if( Delay == 0){
-      Serial.write("D");
-    } else {
+    if( f_psx_ack ){  // ACK interrupt
       Serial.write("A");
+      f_psx_ack = false;
+    } else {  // ACK time out
+      Serial.write("D");
     }
     return SPDR; // return the received byte  
+}
+
+void psx_ack_isr(){
+    f_psx_ack = true;
 }
 
 //Send a command to PlayStation port using SPI
@@ -170,18 +178,21 @@ byte psx_spi_cmd(byte cmdByte, int Delay)
 //Read a frame from Memory Card and send it to serial port
 void psx_read_frame(byte AddressMSB, byte AddressLSB)
 {
+  Serial.write('R');
+  Serial.write(AddressMSB);
+  Serial.write(AddressLSB);
   digitalWrite( PSX_SEL, LOW ); //Activate device
   
-  psx_spi_cmd(0x81, SPI_XFER_BYTE_DELAY_MAX);      //Access Memory Card
-  psx_spi_cmd(0x52, SPI_XFER_BYTE_DELAY_MAX);      //Send read command
-  psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Memory Card ID1
-  psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Memory Card ID2
-  psx_spi_cmd(AddressMSB, SPI_XFER_BYTE_DELAY_MAX);      //Address MSB
-  psx_spi_cmd(AddressLSB, SPI_XFER_BYTE_DELAY_MAX);      //Address LSB
-  psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Memory Card ACK1
-  psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Memory Card ACK2
-  psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Confirm MSB
-  psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Confirm LSB
+  Serial.write(psx_spi_cmd(0x81, SPI_XFER_BYTE_DELAY_MAX));      //Access Memory Card // FF (Error code)
+  Serial.write(psx_spi_cmd(0x52, SPI_XFER_BYTE_DELAY_MAX));      //Send read command // 00
+  Serial.write(psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX));      //Memory Card ID1  //5A
+  Serial.write(psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX));      //Memory Card ID2  //5D
+  Serial.write(psx_spi_cmd(AddressMSB, SPI_XFER_BYTE_DELAY_MAX));      //Address MSB //00
+  Serial.write(psx_spi_cmd(AddressLSB, SPI_XFER_BYTE_DELAY_MAX));      //Address LSB //00
+  Serial.write(psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX));      //Memory Card ACK1  //5C
+  Serial.write(psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX));      //Memory Card ACK2  //5C
+  Serial.write(psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX));      //Confirm MSB // 5D
+  Serial.write(psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX));      //Confirm LSB // FF
   
   //Get 128 byte data from the frame
   for (int i = 0; i < 128; i++)
@@ -241,8 +252,12 @@ void WriteFrame(byte AddressMSB, byte AddressLSB)
 
 void setup()
 {
-  Serial.begin(38400);
-  spi_setup();
+    Serial.begin(38400);
+    spi_setup();
+    // attachInterrupt(interrupt, ISR, mode);
+    // interrupt: numbers 0 (on digital pin 2) and 1 (on digital pin 3)
+    // mode: LOW / CHANGE / RISING / FALLING
+    attachInterrupt(0, psx_ack_isr, FALLING);
 }
 
 void loop()
@@ -252,14 +267,11 @@ void loop()
     if(Serial.available() > 0)
     {
         ReadByte = Serial.read();
-
+        
         switch(ReadByte)
         {
             default:
-//                Serial.write(ERROR);
-                Serial.write("\nERRCMD: ");
-                Serial.write(ReadByte);
-                Serial.write("\n");
+                Serial.write(ERROR);
                 break;
 
             case GETID:
@@ -272,7 +284,8 @@ void loop()
 
             case MCREAD:
                 delay(5);
-                psx_read_frame(Serial.read(), Serial.read());
+                //psx_read_frame(Serial.read(), Serial.read());
+                psx_read_frame(0, 0);
                 break;
 
                 /* case MCWRITE: */
