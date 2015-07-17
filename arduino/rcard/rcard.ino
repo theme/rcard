@@ -65,8 +65,8 @@
 //Commands
 #define GETID 0xA0          //Get identifier
 #define GETVER 0xA1         //Get firmware version
-#define MCREAD 0xA2         //Memory Card Read (frame)
-#define MCWRITE 0xA3        //Memory Card Write (frame)
+#define MCREAD 0x52 // 'R' // 0xA2         //Memory Card Read (frame)
+#define MCWRITE 0x57 // 'W' //        //Memory Card Write (frame)
 
 //Responses
 #define ERROR 0xE0         //Invalid command received (error)
@@ -90,7 +90,7 @@
 #define PSX_DAT  DataPin
 #define PSX_ACK  AckPin
 
-#define SPI_XFER_BYTE_DELAY_MAX     16 // micro seconds
+#define SPI_XFER_BYTE_DELAY_MAX     1500 // micro seconds
 #define SPI_ATT_DELAY    16 // micro seconds
 
 // SPI example
@@ -111,11 +111,11 @@ void spi_setup() {
     pinMode(PSX_ACK, INPUT);
 
     // init status
-    digitalWrite(PSX_DAT, HIGH); // pull up
+    digitalWrite(PSX_DAT, HIGH); // pull up (INPUT)
     digitalWrite(PSX_CMD, LOW);
     digitalWrite(PSX_SEL, HIGH); // un select slave
     digitalWrite(PSX_CLK, HIGH);
-    digitalWrite(PSX_ACK, HIGH); // pull up
+    digitalWrite(PSX_ACK, HIGH); // pull up (INPUT)
 
     // https://www.arduino.cc/en/Tutorial/SPIEEPROM
     // SPI Control Register (SPCR)
@@ -130,7 +130,7 @@ void spi_setup() {
     // CPOL - Sets the data clock to be idle when high if set to 1, idle when low if set to 0
     // CPHA - Samples data on the falling edge of the data clock when 1, rising edge when 0
     // SPR1 and SPR0 - Sets the SPI speed, 00 is fastest (4MHz) 11 is slowest (250KHz)
-    SPCR = (0<<SPIE) | (1<<SPE) | (1<<DORD) | (1<< MSTR) | (1<<CPOL) | (0<<CPHA) | (1<<SPR1) | (1<<SPR0) ;
+    SPCR = (0<<SPIE) | (1<<SPE) | (1<<DORD) | (1<< MSTR) | (1<<CPOL) | (1<<CPHA) | (1<<SPR1) | (1<<SPR0) ;
     
     // SPI data register (SPDR): holds the byte which is about to be shifted out the MOSI line,
     //                           and the data which has just been shifted in the MISO line.
@@ -144,6 +144,7 @@ void spi_setup() {
 
 byte spi_xfer_byte(byte cmdByte, unsigned int Delay){
     SPDR = cmdByte;             // Start the transmission
+//    Serial.write(cmdByte);
     while (!(SPSR & (1<<SPIF))) // Poll for the end of the transmission
     {
     };
@@ -152,13 +153,18 @@ byte spi_xfer_byte(byte cmdByte, unsigned int Delay){
         Delay--;
         delayMicroseconds(1);
     }
+    if( Delay == 0){
+      Serial.write("D");
+    } else {
+      Serial.write("A");
+    }
     return SPDR; // return the received byte  
 }
 
 //Send a command to PlayStation port using SPI
 byte psx_spi_cmd(byte cmdByte, int Delay)
 {
-  return spi_xfer_byte( cmdByte, SPI_XFER_BYTE_DELAY_MAX );
+  return spi_xfer_byte( cmdByte, Delay);
 }
 
 //Read a frame from Memory Card and send it to serial port
@@ -166,25 +172,25 @@ void psx_read_frame(byte AddressMSB, byte AddressLSB)
 {
   digitalWrite( PSX_SEL, LOW ); //Activate device
   
-  psx_spi_cmd(0x81, 500);      //Access Memory Card
-  psx_spi_cmd(0x52, 500);      //Send read command
-  psx_spi_cmd(0x00, 500);      //Memory Card ID1
-  psx_spi_cmd(0x00, 500);      //Memory Card ID2
-  psx_spi_cmd(AddressMSB, 500);      //Address MSB
-  psx_spi_cmd(AddressLSB, 500);      //Address LSB
-  psx_spi_cmd(0x00, 2800);      //Memory Card ACK1
-  psx_spi_cmd(0x00, 2800);      //Memory Card ACK2
-  psx_spi_cmd(0x00, 2800);      //Confirm MSB
-  psx_spi_cmd(0x00, 2800);      //Confirm LSB
+  psx_spi_cmd(0x81, SPI_XFER_BYTE_DELAY_MAX);      //Access Memory Card
+  psx_spi_cmd(0x52, SPI_XFER_BYTE_DELAY_MAX);      //Send read command
+  psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Memory Card ID1
+  psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Memory Card ID2
+  psx_spi_cmd(AddressMSB, SPI_XFER_BYTE_DELAY_MAX);      //Address MSB
+  psx_spi_cmd(AddressLSB, SPI_XFER_BYTE_DELAY_MAX);      //Address LSB
+  psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Memory Card ACK1
+  psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Memory Card ACK2
+  psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Confirm MSB
+  psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Confirm LSB
   
   //Get 128 byte data from the frame
   for (int i = 0; i < 128; i++)
   {
-    Serial.write(psx_spi_cmd(0x00, 150));
+    Serial.write(psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX));
   }
   
-  Serial.write(psx_spi_cmd(0x00, 500));      //Checksum (MSB xor LSB xor Data)
-  Serial.write(psx_spi_cmd(0x00, 500));      //Memory Card status byte
+  Serial.write(psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX));      //Checksum (MSB xor LSB xor Data)
+  Serial.write(psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX));      //Memory Card status byte
   
   digitalWrite( PSX_SEL, HIGH); //Deactivate device
 }
@@ -242,22 +248,18 @@ void setup()
 void loop()
 {
     byte ReadByte = 0;
-    // DEBUG
-    while(1){
-      delay(1);
-      psx_read_frame(0,0);
-      Serial.read();
-    }
     //Listen for commands
     if(Serial.available() > 0)
     {
         ReadByte = Serial.read();
-        //ReadByte = MCREAD;   // DEBUG
 
         switch(ReadByte)
         {
             default:
-                Serial.write(ERROR);
+//                Serial.write(ERROR);
+                Serial.write("\nERRCMD: ");
+                Serial.write(ReadByte);
+                Serial.write("\n");
                 break;
 
             case GETID:
