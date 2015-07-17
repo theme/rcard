@@ -63,9 +63,9 @@
 #define VERSION 0x02         //Firmware version byte (Major.Minor)
 
 //Commands
-#define GETID 0xA0          //Get identifier
+#define GETID 'I'          //Get identifier
 #define GETVER 0xA1         //Get firmware version
-#define MCREAD 0xA2         //Memory Card Read (frame)
+#define MCREAD 'R'         //Memory Card Read (frame)
 #define MCWRITE 0xA3        //Memory Card Write (frame)
 
 //Responses
@@ -90,7 +90,7 @@
 #define PSX_DAT  DataPin
 #define PSX_ACK  AckPin
 
-#define SPI_XFER_BYTE_DELAY_MAX     6000 // micro seconds
+#define SPI_XFER_BYTE_DELAY_MAX     4500 // micro seconds
 #define SPI_ATT_DELAY    16 // micro seconds
 
 // SPI example
@@ -172,76 +172,41 @@ byte psx_spi_cmd(byte cmdByte, int Delay)
   return spi_xfer_byte( cmdByte, Delay);
 }
 
+// frame buffer
+char fb[10 + 128 + 2 + 8];  // read cmd header + frame data + 2 checksum + 8 byte 0x5C if 3rd party card.
+unsigned int fbp, datp;
 //Read a frame from Memory Card and send it to serial port
 void psx_read_frame(byte AddressMSB, byte AddressLSB)
 {
   digitalWrite( PSX_SEL, LOW ); //Activate device
   
-  psx_spi_cmd(0x81, SPI_XFER_BYTE_DELAY_MAX);      //Access Memory Card // FF (Error code)
-  psx_spi_cmd(0x52, SPI_XFER_BYTE_DELAY_MAX);      //Send read command // 00
-  psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Memory Card ID1  //5A
-  psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Memory Card ID2  //5D
-  psx_spi_cmd(AddressMSB, SPI_XFER_BYTE_DELAY_MAX);      //Address MSB //00
-  psx_spi_cmd(AddressLSB, SPI_XFER_BYTE_DELAY_MAX);      //Address LSB //00
-  psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Memory Card ACK1  //5C
-  psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Memory Card ACK2  //5C
-  psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Confirm MSB // 5D
-  psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Confirm LSB // FF
+  fbp=0;
+  fb[fbp++] = psx_spi_cmd(0x81, SPI_XFER_BYTE_DELAY_MAX);      //Access Memory Card // FF (Error code)
+  fb[fbp++] = psx_spi_cmd(0x52, SPI_XFER_BYTE_DELAY_MAX);      //Send read command // 00
+  fb[fbp++] = psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Memory Card ID1  //5A
+  fb[fbp++] = psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Memory Card ID2  //5D
+  fb[fbp++] = psx_spi_cmd(AddressMSB, SPI_XFER_BYTE_DELAY_MAX);      //Address MSB //00
+  fb[fbp++] = psx_spi_cmd(AddressLSB, SPI_XFER_BYTE_DELAY_MAX);      //Address LSB //00
+  fb[fbp++] = psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Memory Card ACK1  //5C
+  fb[fbp++] = psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Memory Card ACK2  //5C
+  fb[fbp++] = psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Confirm MSB // 5D
+  fb[fbp++] = psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Confirm LSB // FF
   
+  datp = fbp;
   //Get 128 byte data from the frame
   for (int i = 0; i < 128; i++)
   {
-    Serial.write(psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX));
+      fb[fbp++] = psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);
   }
-  
-  Serial.write(psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX));      //Checksum (MSB xor LSB xor Data)
-  Serial.write(psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX));      //Memory Card status byte
+  fb[fbp++] = psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Checksum (MSB xor LSB xor Data)
+  fb[fbp++] = psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Memory Card status byte
   
   digitalWrite( PSX_SEL, HIGH); //Deactivate device
-}
 
-//Write a frame from the serial port to the Memory Card
-void WriteFrame(byte AddressMSB, byte AddressLSB)
-{
-  byte ReadData[128];
-  int DelayCounter = 30;
-
-  //Activate device
-  PORTB &= 0xFB;    //Set pin 10 (AttPin, LOW)
-  
-  psx_spi_cmd(0x81, 300);      //Access Memory Card
-  psx_spi_cmd(0x57, 300);      //Send write command
-  psx_spi_cmd(0x00, 300);      //Memory Card ID1
-  psx_spi_cmd(0x00, 300);      //Memory Card ID2
-  psx_spi_cmd(AddressMSB, 300);      //Address MSB
-  psx_spi_cmd(AddressLSB, 300);      //Address LSB
-  
-  //Copy 128 bytes from the serial input
-  for (int i = 0; i < 128; i++)
-  {
-    while(!Serial.available())
-    {
-      DelayCounter--;
-      if(DelayCounter == 0)return;    //If there is no response for 30ms stop writing (prevents lock on MemCARDuino)
-      delay(1);
-    }
-    
-    ReadData[i] = Serial.read();
+  // wite back to serial
+  for (int i = 0; i < sizeof fb; i++){
+      Serial.write(fb[i]);
   }
-
-  //Write 128 byte data to the frame
-  for (int i = 0; i < 128; i++)
-  {
-    psx_spi_cmd(ReadData[i], 150);
-  }
-  
-  psx_spi_cmd(Serial.read(), 200);      //Checksum (MSB xor LSB xor Data)
-  psx_spi_cmd(0x00, 200);      //Memory Card ACK1
-  psx_spi_cmd(0x00, 200);      //Memory Card ACK2
-  Serial.write(psx_spi_cmd(0x00, 200));      //Memory Card status byte
-  
-  //Deactivate device
-  PORTB |= 4;    //Set pin 10 (AttPin, HIGH)
 }
 
 void setup()
@@ -279,7 +244,7 @@ void loop()
 
             case MCREAD:
                 delay(5);
-                psx_read_frame(Serial.read(), Serial.read());
+                psx_read_frame(1, 1);
                 break;
 
                 /* case MCWRITE: */

@@ -1,0 +1,8 @@
+*.pro.user*
+*.png
+*.ico
+
+# git mergetool : meld
+**.orig
+
+**.autosave
