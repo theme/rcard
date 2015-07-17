@@ -77,89 +77,114 @@
 //0xFF - BadSector
 
 //Define pins
-#define DataPin 12         //Data
-#define CmdPin 11          //Command
-#define AttPin 10          //Attention (Select)
-#define ClockPin 13        //Clock
-#define AckPin 2           //Acknowledge
+#define DataPin 12         //Data                   // SPI MISO
+#define CmdPin 11          //Command                // SPI MOSI 
+#define AttPin 10          //Attention (Select)     // SPI SS
+#define ClockPin 13        //Clock                  // SPI SCK      // build in LED
+#define AckPin 2           //Acknowledge            // external IRQ, (2 or 3 is supported)
 
-byte ReadByte = 0;
+// user schema for PSX
+#define PSX_SEL  AttPin
+#define PSX_CLK  ClockPin
+#define PSX_CMD  CmdPin
+#define PSX_DAT  DataPin
+#define PSX_ACK  AckPin
 
-//Set up pins for communication
-void PinSetup()
-{
-  byte clr = 0;
-  
-  pinMode(DataPin, INPUT);
-  pinMode(CmdPin, OUTPUT);
-  pinMode(AttPin, OUTPUT);
-  pinMode(ClockPin, OUTPUT);
-  pinMode(AckPin, INPUT);
-  
-  //Set up SPI on Arduino (250 kHz, clock active when low, reading on falling edge of the clock)
-  SPCR = 0x7F;
-  clr=SPSR;
-  clr=SPDR;
-  
-  digitalWrite(DataPin, HIGH);    //Activate pullup resistor
-  digitalWrite(CmdPin, LOW);
-  digitalWrite(AttPin, HIGH);
-  digitalWrite(ClockPin, HIGH);
-  digitalWrite(AckPin, HIGH);    //Activate pullup resistor
+#define SPI_XFER_BYTE_DELAY_MAX     16 // micro seconds
+#define SPI_ATT_DELAY    16 // micro seconds
+
+// SPI example
+// SPI.beginTransaction(SPISettings(14000000, MSBFIRST, SPI_MODE0));
+//If other libraries use SPI from interrupts, they will be prevented from accessing SPI until you call SPI.endTransaction(). Your settings remain in effect for the duration of your "transaction". You should attempt to minimize the time between before you call SPI.endTransaction(), for best compatibility if your program is used together with other libraries which use SPI.
+//With most SPI devices, after SPI.beginTransaction(), you will write the slave select pin LOW, call SPI.transfer() any number of times to transfer data, then write the SS pin HIGH, and finally call SPI.endTransaction().
+
+
+void spi_setup() {
+    // junk clr variable
+    byte clr;
+
+    // pin mode
+    pinMode(PSX_DAT, INPUT);
+    pinMode(PSX_CMD, OUTPUT);
+    pinMode(PSX_SEL, OUTPUT);
+    pinMode(PSX_CLK, OUTPUT);
+    pinMode(PSX_ACK, INPUT);
+
+    // init status
+    digitalWrite(PSX_DAT, HIGH); // pull up
+    digitalWrite(PSX_CMD, LOW);
+    digitalWrite(PSX_SEL, HIGH); // un select slave
+    digitalWrite(PSX_CLK, HIGH);
+    digitalWrite(PSX_ACK, HIGH); // pull up
+
+    // https://www.arduino.cc/en/Tutorial/SPIEEPROM
+    // SPI Control Register (SPCR)
+    // PCR
+    // | 7    | 6    | 5    | 4    | 3    | 2    | 1    | 0    |
+    // | SPIE | SPE  | DORD | MSTR | CPOL | CPHA | SPR1 | SPR0 |
+    //
+    // SPIE - Enables the SPI interrupt when 1
+    // SPE - Enables the SPI when 1
+    // DORD - Sends data least Significant Bit First when 1, most Significant Bit first when 0
+    // MSTR - Sets the Arduino in master mode when 1, slave mode when 0
+    // CPOL - Sets the data clock to be idle when high if set to 1, idle when low if set to 0
+    // CPHA - Samples data on the falling edge of the data clock when 1, rising edge when 0
+    // SPR1 and SPR0 - Sets the SPI speed, 00 is fastest (4MHz) 11 is slowest (250KHz)
+    SPCR = (0<<SPIE) | (1<<SPE) | (1<<DORD) | (1<< MSTR) | (1<<CPOL) | (0<<CPHA) | (1<<SPR1) | (1<<SPR0)
+    
+    // SPI data register (SPDR): holds the byte which is about to be shifted out the MOSI line,
+    //                           and the data which has just been shifted in the MISO line.
+    clr = SPDR;     // read will cause hardware clear of flags
+    
+    // SPI status register (SPSR): gets set to 1 when a value is shifted in or out of the SPI.
+    clr = SPSR;     // read will cause hardware clear of flags
 }
 
-byte SendByte(byte CommandByte, int Delay){
-  Delay = 3000;
-    SPDR = CommandByte;             // Start the transmission
-    while (!(SPSR & (1<<SPIF)))     // Wait for the end of the transmission
+byte spi_xfer_byte(byte cmdByte, unsigned int Delay){
+    SPDR = cmdByte;             // Start the transmission
+    while (!(SPSR & (1<<SPIF))) // Poll for the end of the transmission
     {
     };
-    
-    //Wait for the ACK signal from the Memory Card for preset delay
-    while((PORTD & 4) > 0)
+    while( digitalRead(PSX_ACK) && Delay > 0 ) // Poll for the ACK signal from the Memory Card
     {
-      Delay--;
-      delayMicroseconds(1);
-      if(Delay == 0)break;
+        Delay--;
+        delayMicroseconds(1);
     }
-    
-  return SPDR;                    // return the received byte  
+    return SPDR; // return the received byte  
 }
 
 //Send a command to PlayStation port using SPI
-byte SendCommand(byte CommandByte, int Delay)
+byte psx_spi_cmd(byte CommandByte, int Delay)
 {
-  return SendByte( CommandByte, Delay );
+  return spi_xfer_byte( cmdByte, SPI_XFER_BYTE_DELAY_MAX );
 }
 
 //Read a frame from Memory Card and send it to serial port
-void ReadFrame(byte AddressMSB, byte AddressLSB)
+void psx_read_frame(byte AddressMSB, byte AddressLSB)
 {
-  //Activate device
-  PORTB &= 0xFB;    //Set pin 10 (AttPin, LOW)
+  digitalWrite( PSX_SEL, LOW ); //Activate device
   
-  SendCommand(0x81, 500);      //Access Memory Card
-  SendCommand(0x52, 500);      //Send read command
-  SendCommand(0x00, 500);      //Memory Card ID1
-  SendCommand(0x00, 500);      //Memory Card ID2
-  SendCommand(AddressMSB, 500);      //Address MSB
-  SendCommand(AddressLSB, 500);      //Address LSB
-  SendCommand(0x00, 2800);      //Memory Card ACK1
-  SendCommand(0x00, 2800);      //Memory Card ACK2
-  SendCommand(0x00, 2800);      //Confirm MSB
-  SendCommand(0x00, 2800);      //Confirm LSB
+  psx_spi_cmd(0x81, 500);      //Access Memory Card
+  psx_spi_cmd(0x52, 500);      //Send read command
+  psx_spi_cmd(0x00, 500);      //Memory Card ID1
+  psx_spi_cmd(0x00, 500);      //Memory Card ID2
+  psx_spi_cmd(AddressMSB, 500);      //Address MSB
+  psx_spi_cmd(AddressLSB, 500);      //Address LSB
+  psx_spi_cmd(0x00, 2800);      //Memory Card ACK1
+  psx_spi_cmd(0x00, 2800);      //Memory Card ACK2
+  psx_spi_cmd(0x00, 2800);      //Confirm MSB
+  psx_spi_cmd(0x00, 2800);      //Confirm LSB
   
   //Get 128 byte data from the frame
   for (int i = 0; i < 128; i++)
   {
-    Serial.write(SendCommand(0x00, 150));
+    Serial.write(psx_spi_cmd(0x00, 150));
   }
   
-  Serial.write(SendCommand(0x00, 500));      //Checksum (MSB xor LSB xor Data)
-  Serial.write(SendCommand(0x00, 500));      //Memory Card status byte
+  Serial.write(psx_spi_cmd(0x00, 500));      //Checksum (MSB xor LSB xor Data)
+  Serial.write(psx_spi_cmd(0x00, 500));      //Memory Card status byte
   
-  //Deactivate device
-  PORTB |= 4;    //Set pin 10 (AttPin, HIGH)
+  digitalWrite( PSX_SEL, HIGH); //Deactivate device
 }
 
 //Write a frame from the serial port to the Memory Card
@@ -171,12 +196,12 @@ void WriteFrame(byte AddressMSB, byte AddressLSB)
   //Activate device
   PORTB &= 0xFB;    //Set pin 10 (AttPin, LOW)
   
-  SendCommand(0x81, 300);      //Access Memory Card
-  SendCommand(0x57, 300);      //Send write command
-  SendCommand(0x00, 300);      //Memory Card ID1
-  SendCommand(0x00, 300);      //Memory Card ID2
-  SendCommand(AddressMSB, 300);      //Address MSB
-  SendCommand(AddressLSB, 300);      //Address LSB
+  psx_spi_cmd(0x81, 300);      //Access Memory Card
+  psx_spi_cmd(0x57, 300);      //Send write command
+  psx_spi_cmd(0x00, 300);      //Memory Card ID1
+  psx_spi_cmd(0x00, 300);      //Memory Card ID2
+  psx_spi_cmd(AddressMSB, 300);      //Address MSB
+  psx_spi_cmd(AddressLSB, 300);      //Address LSB
   
   //Copy 128 bytes from the serial input
   for (int i = 0; i < 128; i++)
@@ -194,13 +219,13 @@ void WriteFrame(byte AddressMSB, byte AddressLSB)
   //Write 128 byte data to the frame
   for (int i = 0; i < 128; i++)
   {
-    SendCommand(ReadData[i], 150);
+    psx_spi_cmd(ReadData[i], 150);
   }
   
-  SendCommand(Serial.read(), 200);      //Checksum (MSB xor LSB xor Data)
-  SendCommand(0x00, 200);      //Memory Card ACK1
-  SendCommand(0x00, 200);      //Memory Card ACK2
-  Serial.write(SendCommand(0x00, 200));      //Memory Card status byte
+  psx_spi_cmd(Serial.read(), 200);      //Checksum (MSB xor LSB xor Data)
+  psx_spi_cmd(0x00, 200);      //Memory Card ACK1
+  psx_spi_cmd(0x00, 200);      //Memory Card ACK2
+  Serial.write(psx_spi_cmd(0x00, 200));      //Memory Card status byte
   
   //Deactivate device
   PORTB |= 4;    //Set pin 10 (AttPin, HIGH)
@@ -208,46 +233,43 @@ void WriteFrame(byte AddressMSB, byte AddressLSB)
 
 void setup()
 {
-  //Set up serial communication
   Serial.begin(38400);
-  
-  //Set up pins
-  PinSetup();
+  spi_setup();
 }
 
 void loop()
 {
-  //Listen for commands
-  if(Serial.available() > 0)
-  {
-    ReadByte = Serial.read();
-    
-    switch(ReadByte)
+    byte ReadByte = 0;
+    //Listen for commands
+    if(Serial.available() > 0)
     {
-      default:
-        Serial.write(ERROR);
-        break;
-        
-      case GETID:
-        Serial.write(IDENTIFIER);
-        break;
-        
-      case GETVER:
-        Serial.write(VERSION);
-        break;
-        
-      case MCREAD:
-      delay(5);
-      ReadFrame(Serial.read(), Serial.read());
-        break;
-        
-      case MCWRITE:
-      delay(5);
-      WriteFrame(Serial.read(), Serial.read());
-        break;
+        /* ReadByte = Serial.read(); */
+        ReadByte = GETID;   // DEBUG
+
+        switch(ReadByte)
+        {
+            default:
+                Serial.write(ERROR);
+                break;
+
+            case GETID:
+                Serial.write(IDENTIFIER);
+                break;
+
+            case GETVER:
+                Serial.write(VERSION);
+                break;
+
+            case MCREAD:
+                delay(5);
+                psx_read_frame(Serial.read(), Serial.read());
+                break;
+
+                /* case MCWRITE: */
+                /* delay(5); */
+                /* WriteFrame(Serial.read(), Serial.read()); */
+                /*   break; */
+        }
     }
-  }
 }
-
-
 
