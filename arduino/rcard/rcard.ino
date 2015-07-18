@@ -218,12 +218,12 @@ void parseCmd() {
       break;
 
     case 'R':
-      //delay(5);
-      //psx_read_frame(1, 1);
       if ( cmdlen < 3 ) return; // do not reset cmd buf
       Serial.write('R');
       Serial.write(cmdbuf[1]);  // echo addr
       Serial.write(cmdbuf[2]);
+      delay(5); // avoid continus read
+      psx_read_frame(cmdbuf[1], cmdbuf[2]);
       break;
 
     case 'S':
