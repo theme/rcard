@@ -46,14 +46,13 @@ void MainWindow::choosePort()
 void MainWindow::readPort()
 {
     QByteArray bytes = port_.readAll();
-    QString text(bytes.toHex());
+    QString text = QString(bytes.toHex());
     this->addText(text.toUpper());
-    qDebug() << bytes;
 }
 
 void MainWindow::sendCmd(int cmd_enum)
 {
-    char readcmd[] = {'R', 0x00, 0xff};
+    char readcmd[] = {'R',0,0};
     char idcmd[] = {'S'};
 
     switch(cmd_enum){
@@ -64,6 +63,7 @@ void MainWindow::sendCmd(int cmd_enum)
         port_.write(idcmd, sizeof idcmd);
         break;
     }
+
     if (port_.error() != QSerialPort::NoError)
         this->addText("error write Serial."+ port_.errorString());
 
