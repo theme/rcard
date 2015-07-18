@@ -57,9 +57,10 @@
 #define PSX_DAT  DataPin
 #define PSX_ACK  AckPin
 
-#define SPI_XFER_BYTE_DELAY_MAX     4500 // micro seconds
+#define SPI_XFER_BYTE_DELAY_MAX     6000 // micro seconds
 #define SPI_ATT_DELAY    16 // micro seconds
 
+#define FRAME_BUF_SIZE (10 + 128 + 2 + 8)
 // SPI example
 // SPI.beginTransaction(SPISettings(14000000, MSBFIRST, SPI_MODE0));
 //If other libraries use SPI from interrupts, they will be prevented from accessing SPI until you call SPI.endTransaction(). Your settings remain in effect for the duration of your "transaction". You should attempt to minimize the time between before you call SPI.endTransaction(), for best compatibility if your program is used together with other libraries which use SPI.
@@ -140,7 +141,7 @@ byte psx_spi_cmd(byte cmdByte, int Delay)
 }
 
 // frame buffer
-char fb[10 + 128 + 2 + 8];  // read cmd header + frame data + 2 checksum + 8 byte 0x5C if 3rd party card.
+char fb[FRAME_BUF_SIZE];  // read cmd header + frame data + 2 checksum + 8 byte 0x5C if 3rd party card.
 unsigned int fbp, datp;
 //Read a frame from Memory Card and send it to serial port
 void psx_read_frame(byte AddressMSB, byte AddressLSB)
@@ -167,6 +168,7 @@ void psx_read_frame(byte AddressMSB, byte AddressLSB)
   }
   fb[fbp++] = psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Checksum (MSB xor LSB xor Data)
   fb[fbp++] = psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Memory Card status byte
+  fb[fbp++] = psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      // 3rd party tail
 
   digitalWrite( PSX_SEL, HIGH); //Deactivate device
 

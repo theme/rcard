@@ -9,6 +9,8 @@
 #include <QTime>
 #include <QDebug>
 
+#include "frame.h"
+
 namespace Ui {
 class MainWindow;
 }
@@ -46,10 +48,14 @@ private:
     void openPort(QString portName = QString());
     void closePort();
     void addText(QString text);
+    QString char2Hex(char c);
     Ui::MainWindow *ui;
     QSerialPort port_;
     QList<QRadioButton*> all_porots_;
     QString memcard_fn_;
+    int last_cmd_;
+
+    Frame frame_dbg_;
 };
 
 #endif // MAINWINDOW_H

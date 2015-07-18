@@ -48,19 +48,50 @@ void MainWindow::readPort()
     QByteArray bytes = port_.readAll();
     QString text = QString(bytes.toHex());
     this->addText(text.toUpper());
+
+    int i;
+    switch ( last_cmd_ ) {
+    case CMD_READ:
+        if ( frame_dbg_.isEmpty() ) {
+            // skip header
+            bytes = bytes.mid(10);
+        }
+        i = frame_dbg_.appendData(bytes) ;
+        this->addText("append " + QString::number(i));
+        if ( i < bytes.size() ){
+            // get remote check sum
+            char checksum = bytes.at(i);
+            char status = bytes.at(i+1);
+            this->addText("remote checksum = " + char2Hex(checksum));
+            this->addText("remote status = " + char2Hex(status));
+        }
+        if (frame_dbg_.isFull()) {
+            frame_dbg_.setAddress(1,1);
+            this->addText("got frame, sum = "+
+                          frame_dbg_.checksumHex());
+            this->addText(frame_dbg_.dataHex());
+            frame_dbg_.clear();
+        }
+        break;
+    case CMD_ID:
+        break;
+    }
 }
 
 void MainWindow::sendCmd(int cmd_enum)
 {
-    char readcmd[] = {'R',0,0};
+    char readcmd[] = {'R',1,1};
     char idcmd[] = {'S'};
 
     switch(cmd_enum){
     case CMD_READ:
+        frame_dbg_.clear();
         port_.write(readcmd, sizeof readcmd);
+        last_cmd_ = CMD_READ;
         break;
     case CMD_ID:
         port_.write(idcmd, sizeof idcmd);
+        last_cmd_ = CMD_ID;
         break;
     }
 
@@ -134,6 +165,12 @@ void MainWindow::closePort()
 void MainWindow::addText(QString text)
 {
     ui->text->appendPlainText(QTime::currentTime().toString() + "| "+ text);
+}
+
+QString MainWindow::char2Hex(char c)
+{
+    QByteArray a(&c,1);
+    return QString(a.toHex()).toUpper();
 }
 
 void MainWindow::on_readButton_clicked()
