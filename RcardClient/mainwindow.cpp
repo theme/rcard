@@ -17,6 +17,12 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(&port_, SIGNAL(readyRead()),
             this, SLOT(readPort()));
 
+    connect(&rcard_timer_, SIGNAL(timeout()),
+            this, SLOT(onRcardTimer()));
+
+    connect(this, SIGNAL(sigFrameGot()),
+            this, SLOT(saveFrame()));
+
     // auto select if only one serial port
     if ( all_porots_.length() == 1 ){
         QRadioButton *w = all_porots_.first();
@@ -61,14 +67,14 @@ void MainWindow::readPort()
             // get remote check sum
             char checksum = bytes.at(i);
             char status = bytes.at(i+1);
-            this->addText("remote checksum = " + char2Hex(checksum));
-            this->addText("remote status = " + char2Hex(status));
-        }
-        if (frame_dbg_.isFull()) {
-            this->addText("got frame, sum = "+
-                          frame_dbg_.checksumHex());
-            this->addText(frame_dbg_.dataHex());
-            frame_dbg_.clear();
+            if ( status == 0x47
+                 && checksum == frame_dbg_.checksum()
+                 && frame_dbg_.isFull()){
+                emit sigFrameGot();
+                this->addText("got frame "
+                              + frame_dbg_.indexString());
+                this->addText(frame_dbg_.dataHex());
+            }
         }
         break;
     case CMD_ID:
@@ -116,8 +122,10 @@ void MainWindow::readFrame(int block, int frame)
 
 void MainWindow::on_chooseFileBtn_clicked()
 {
-    memcard_fn_ = openSaveFile();
-    ui->fileName->setText(memcard_fn_);
+    QString fn = openSaveFile();
+    if ( fn != ui->fileName->text() )
+    ui->fileName->setText(fn);
+    card_.clear();
 }
 
 QString MainWindow::openSaveFile()
@@ -127,8 +135,7 @@ QString MainWindow::openSaveFile()
                                                tr("Choose Memory Card file"),
                                                QDir::homePath(),
                                                tr("Memory Card File (*.mcr)"),
-                                               &selfilter,
-                                               QFileDialog::DontConfirmOverwrite );
+                                               &selfilter);
     return fn;
 }
 
@@ -213,4 +220,51 @@ void MainWindow::on_setDelayBtn_clicked()
     char msb = d >> 8;
     char lsb = d;
     this->sendCmd(CMD_DELAY, msb, lsb);
+}
+
+void MainWindow::on_saveCardButton_clicked()
+{
+    rcard_timer_.start(1000);
+}
+
+void MainWindow::onRcardTimer()
+{
+    rcard_timer_.stop();
+    qint32 addr;
+    if ( !card_.isFull() ){
+        // which frame is need ?
+        addr  = card_.needFrameAtAddr();
+        // set frame
+        if ( 0 != frame_dbg_.addr() - addr){
+            frame_dbg_.clear();
+            frame_dbg_.setAddress(addr);
+        }
+        // read frame
+        this->readFrame(frame_dbg_.block(),
+                        frame_dbg_.frame());
+
+        rcard_timer_.start(1000);
+    } else {
+        saveCard2File();
+    }
+}
+
+void MainWindow::saveFrame()
+{
+    card_.insertFrame(frame_dbg_);
+}
+
+void MainWindow::saveCard2File()
+{
+    QFile f(ui->fileName);
+    if (f.open(QIODevice::WriteOnly)){
+        f.write(card_.data());
+        f.close();
+        this->addText(f.fileName() + " saved.");
+    }
+}
+
+void MainWindow::on_stopReadButton_clicked()
+{
+    rcard_timer_.stop();
 }

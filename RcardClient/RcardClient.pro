@@ -14,9 +14,11 @@ TEMPLATE = app
 
 SOURCES += main.cpp\
         mainwindow.cpp \
-    frame.cpp
+    frame.cpp \
+    memcard.cpp
 
 HEADERS  += mainwindow.h \
-    frame.h
+    frame.h \
+    memcard.h
 
 FORMS    += mainwindow.ui

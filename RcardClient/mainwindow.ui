@@ -46,13 +46,6 @@
        <string>Save file</string>
       </property>
       <layout class="QGridLayout" name="gridLayout_5">
-       <item row="2" column="1">
-        <widget class="QPushButton" name="saveCardButton">
-         <property name="text">
-          <string>&amp;Save Card &gt; File</string>
-         </property>
-        </widget>
-       </item>
        <item row="2" column="0">
         <widget class="QPushButton" name="chooseFileBtn">
          <property name="text">
@@ -64,6 +57,20 @@
         <widget class="QLabel" name="fileName">
          <property name="text">
           <string>File Name</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QPushButton" name="saveCardButton">
+         <property name="text">
+          <string>&amp;Save Card &gt; File</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="2">
+        <widget class="QPushButton" name="stopReadButton">
+         <property name="text">
+          <string>St&amp;op reading</string>
          </property>
         </widget>
        </item>

@@ -7,9 +7,10 @@
 #include <QRadioButton>
 #include <QFileDialog>
 #include <QTime>
+#include <QTimer>
 #include <QDebug>
 
-#include "frame.h"
+#include "memcard.h"
 
 namespace Ui {
 class MainWindow;
@@ -29,6 +30,9 @@ public:
         CMD_DELAY
     };
 
+signals:
+    void sigFrameGot();
+
 private slots:
     void choosePort();
     void readPort();
@@ -45,6 +49,13 @@ private slots:
 
     void on_setDelayBtn_clicked();
 
+    void on_saveCardButton_clicked();
+
+    void onRcardTimer();
+    void saveFrame();
+    void saveCard2File();
+    void on_stopReadButton_clicked();
+
 private:
     QString openSaveFile();
     void setPortParameters();
@@ -56,10 +67,11 @@ private:
     Ui::MainWindow *ui;
     QSerialPort port_;
     QList<QRadioButton*> all_porots_;
-    QString memcard_fn_;
     int last_cmd_;
 
     Frame frame_dbg_;
+    MemCard card_;
+    QTimer rcard_timer_;
 };
 
 #endif // MAINWINDOW_H
