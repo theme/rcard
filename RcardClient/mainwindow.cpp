@@ -16,6 +16,13 @@ MainWindow::MainWindow(QWidget *parent) :
 
     connect(&port_, SIGNAL(readyRead()),
             this, SLOT(readPort()));
+
+    // auto select if only one serial port
+    if ( all_porots_.length() == 1 ){
+        QRadioButton *w = all_porots_.first();
+        w->setChecked(true);
+        this->setPort(w->text());
+    }
 }
 
 MainWindow::~MainWindow()
@@ -30,8 +37,7 @@ void MainWindow::choosePort()
 
     foreach(QRadioButton *w, all_porots_){
         if(w->isChecked()){
-            port_.setPortName(w->text());
-            this->statusBar()->showMessage(port_.portName());
+            this->setPort(w->text());
             break;
         }
     }
@@ -92,6 +98,12 @@ void MainWindow::setPortParameters()
     port_.setDataBits(QSerialPort::Data8);
     port_.setStopBits(QSerialPort::OneStop);
     port_.setParity(QSerialPort::NoParity);
+}
+
+void MainWindow::setPort(QString portName)
+{
+    port_.setPortName(portName);
+    this->statusBar()->showMessage(portName);
 }
 
 void MainWindow::on_saveButton_clicked()
