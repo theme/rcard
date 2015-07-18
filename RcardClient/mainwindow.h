@@ -39,6 +39,7 @@ private:
     QString openSaveFile();
     void setPortParameters();
     void setPort(QString portName);
+    void openPort(QString portName);
     Ui::MainWindow *ui;
     QSerialPort port_;
     QList<QRadioButton*> all_porots_;

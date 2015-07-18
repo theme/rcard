@@ -106,16 +106,28 @@ void MainWindow::setPort(QString portName)
     this->statusBar()->showMessage(portName);
 }
 
+void MainWindow::openPort(QString portName)
+{
+    if (portName.isEmpty())
+        return;
+    if ( port_.isOpen()) {      // close
+        port_.close();
+    }
+    if ( port_.portName() != portName) { // set
+        this->setPort( portName );
+    }
+    this->setPortParameters();
+
+    if (port_.open(QIODevice::ReadWrite)){  // open
+        ui->text->appendPlainText(port_.portName() + " opened.\n");
+    } else {
+        ui->statusBar->showMessage("error open " + port_.portName());
+        return;
+    }
+}
+
 void MainWindow::on_saveButton_clicked()
 {
-    if (!port_.isOpen()){
-        this->setPortParameters();
-        if (port_.open(QIODevice::ReadWrite)){
-            ui->text->appendPlainText(port_.portName() + " opened.\n");
-        } else {
-            ui->statusBar->showMessage("error open " + port_.portName());
-            return;
-        }
-    }
+    this->openPort(port_.portName());
     this->sendCmd(CMD_READ);
 }
