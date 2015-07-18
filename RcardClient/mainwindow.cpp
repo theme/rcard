@@ -47,12 +47,12 @@ void MainWindow::readPort()
         text += QString(QByteArray::fromRawData(&c,1).toHex()).toUpper();
         text += " ";
     }
-    ui->text->appendPlainText(text);
+    ui->text->appendPlainText(QTime::currentTime().toString() + "| "+ text);
 }
 
 void MainWindow::sendCmd(int cmd_enum)
 {
-    char readcmd[] = {'R'};
+    char readcmd[] = {'R', 0x0a, 0x0f};
     char idcmd[] = {'I'};
     char *cmd;
 
@@ -105,7 +105,5 @@ void MainWindow::on_saveButton_clicked()
             return;
         }
     }
-
-    char R = 'R';
-    port_.write(&R);
+    this->sendCmd(CMD_READ);
 }

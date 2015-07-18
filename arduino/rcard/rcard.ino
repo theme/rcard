@@ -227,7 +227,9 @@ void loop()
     if(Serial.available() > 0)
     {
         ReadByte = Serial.read();
-        
+        Serial.write(ReadByte);
+        Serial.write(ReadByte);
+        return;
         switch(ReadByte)
         {
             default:
@@ -246,11 +248,6 @@ void loop()
                 delay(5);
                 psx_read_frame(1, 1);
                 break;
-
-                /* case MCWRITE: */
-                /* delay(5); */
-                /* WriteFrame(Serial.read(), Serial.read()); */
-                /*   break; */
         }
     }
 }

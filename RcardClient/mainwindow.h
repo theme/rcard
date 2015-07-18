@@ -6,6 +6,7 @@
 #include <QSerialPort>
 #include <QRadioButton>
 #include <QFileDialog>
+#include <QTime>
 #include <QDebug>
 
 namespace Ui {
