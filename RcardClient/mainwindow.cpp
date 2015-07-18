@@ -78,8 +78,12 @@ void MainWindow::readPort()
 
 void MainWindow::sendCmd(int cmd_enum, char msb, char lsb)
 {
+    if (!port_.isOpen())
+        this->openPort(port_.portName());
+
     char readcmd[] = {'R', msb, lsb};
     char idcmd[] = {'S'};
+    char delaycmd[] = {'D', msb, lsb};
 
     switch(cmd_enum){
     case CMD_READ:
@@ -89,6 +93,10 @@ void MainWindow::sendCmd(int cmd_enum, char msb, char lsb)
     case CMD_ID:
         port_.write(idcmd, sizeof idcmd);
         last_cmd_ = CMD_ID;
+        break;
+    case CMD_DELAY:
+        port_.write(delaycmd, sizeof delaycmd);
+        last_cmd_ = CMD_DELAY;
         break;
     }
 
@@ -179,14 +187,6 @@ QString MainWindow::char2Hex(char c)
     return QString(a.toHex()).toUpper();
 }
 
-void MainWindow::on_readButton_clicked()
-{
-    if (!port_.isOpen())
-        this->openPort(port_.portName());
-    this->readFrame(ui->blockIndex->value(),
-                    ui->frameIndex->value());   // DEBUG
-}
-
 void MainWindow::on_portToggle_toggled(bool checked)
 {
     if (checked) {
@@ -198,6 +198,19 @@ void MainWindow::on_portToggle_toggled(bool checked)
 
 void MainWindow::on_idButton_clicked()
 {
-    this->openPort(port_.portName());
     this->sendCmd(CMD_ID);
+}
+
+void MainWindow::on_readFrameBtn_clicked()
+{
+    this->readFrame(ui->blockIndex->value(),
+                    ui->frameIndex->value());   // DEBUG
+}
+
+void MainWindow::on_setDelayBtn_clicked()
+{
+    unsigned long d = ui->delayValue->value();
+    char msb = d >> 8;
+    char lsb = d;
+    this->sendCmd(CMD_DELAY, msb, lsb);
 }

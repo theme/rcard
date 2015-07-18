@@ -25,7 +25,8 @@ public:
 
     enum CMD {
         CMD_READ,
-        CMD_ID
+        CMD_ID,
+        CMD_DELAY
     };
 
 private slots:
@@ -36,11 +37,13 @@ private slots:
 
     void on_chooseFileBtn_clicked();
 
-    void on_readButton_clicked();
-
     void on_portToggle_toggled(bool checked);
 
     void on_idButton_clicked();
+
+    void on_readFrameBtn_clicked();
+
+    void on_setDelayBtn_clicked();
 
 private:
     QString openSaveFile();

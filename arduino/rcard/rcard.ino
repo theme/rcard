@@ -57,7 +57,7 @@
 #define PSX_DAT  DataPin
 #define PSX_ACK  AckPin
 
-#define SPI_XFER_BYTE_DELAY_MAX     6000 // micro seconds
+unsigned long SPI_XFER_BYTE_DELAY_MAX  =   1000; // micro seconds
 #define SPI_ATT_DELAY    16 // micro seconds
 
 #define FRAME_BUF_SIZE (10 + 128 + 2 + 8)
@@ -153,12 +153,12 @@ void psx_read_frame(byte AddressMSB, byte AddressLSB)
   fb[fbp++] = psx_spi_cmd(0x52, SPI_XFER_BYTE_DELAY_MAX);      //Send read command // 00
   fb[fbp++] = psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Memory Card ID1  //5A
   fb[fbp++] = psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Memory Card ID2  //5D
-  fb[fbp++] = psx_spi_cmd(AddressMSB, SPI_XFER_BYTE_DELAY_MAX);      //Address MSB //00
-  fb[fbp++] = psx_spi_cmd(AddressLSB, SPI_XFER_BYTE_DELAY_MAX);      //Address LSB //00
-  fb[fbp++] = psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Memory Card ACK1  //5C
-  fb[fbp++] = psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Memory Card ACK2  //5C
-  fb[fbp++] = psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Confirm MSB // 5D
-  fb[fbp++] = psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX);      //Confirm LSB // FF
+  fb[fbp++] = psx_spi_cmd(AddressMSB, SPI_XFER_BYTE_DELAY_MAX*6);      //Address MSB //00
+  fb[fbp++] = psx_spi_cmd(AddressLSB, SPI_XFER_BYTE_DELAY_MAX*6);      //Address LSB //00
+  fb[fbp++] = psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX*6);      //Memory Card ACK1  //5C
+  fb[fbp++] = psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX*6);      //Memory Card ACK2  //5C
+  fb[fbp++] = psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX*6);      //Confirm MSB // 5D
+  fb[fbp++] = psx_spi_cmd(0x00, SPI_XFER_BYTE_DELAY_MAX*6);      //Confirm LSB // FF
 
   datp = fbp;
   //Get 128 byte data from the frame
@@ -201,13 +201,22 @@ void parseCmd() {
 
     case 'R':
       if ( cmdlen < 3 ) return; // do not reset cmd buf
-      Serial.write('R');
-      Serial.write(cmdbuf[1]);  // echo addr
-      Serial.write(cmdbuf[2]);
       delay(5); // avoid continus read
       psx_read_frame(cmdbuf[1], cmdbuf[2]);
       break;
 
+    case 'D':
+      if (cmdlen < 3 ) return;
+      SPI_XFER_BYTE_DELAY_MAX = cmdbuf[1];
+      SPI_XFER_BYTE_DELAY_MAX <<= 8;
+      SPI_XFER_BYTE_DELAY_MAX += cmdbuf[2];
+      cmdbuf[1] = SPI_XFER_BYTE_DELAY_MAX>>8;
+      cmdbuf[2] = SPI_XFER_BYTE_DELAY_MAX;
+      Serial.write('D');
+      Serial.write(cmdbuf[1]);
+      Serial.write(cmdbuf[2]);
+      break;
+      
     case 'S':
       Serial.write('S');
       break;
