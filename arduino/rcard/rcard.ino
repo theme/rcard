@@ -207,42 +207,39 @@ void setup()
 }
 
 #define CMDLEN_MAX 3
-byte cmd[CMDLEN_MAX] = {0};
+byte cmdbuf[CMDLEN_MAX] = {0};
 unsigned cmdlen = 0;
 
 void parseCmd() {
-  switch (cmd[0])
+  switch (cmdbuf[0])
   {
     default:
-      Serial.write(0xEE);
+      Serial.write('E');
       break;
 
     case 'R':
       //delay(5);
       //psx_read_frame(1, 1);
+      if ( cmdlen < 3 ) return; // do not reset cmd buf
       Serial.write('R');
-      Serial.write(cmd[1]);  // echo addr
-      Serial.write(cmd[2]);
+      Serial.write(cmdbuf[1]);  // echo addr
+      Serial.write(cmdbuf[2]);
       break;
 
     case 'S':
       Serial.write('S');
       break;
   }
+  memset(cmdbuf, 0 , CMDLEN_MAX);
+  cmdlen = 0;
 }
-//    cmd[cmdlen++] = serialByte;
-//    if (CMDLEN_MAX == cmdlen) {
-//      runCmd();
-//      cmdlen = 0;
-//    }
 
-byte serialByte;
 void loop()
 {
   if (Serial.available() > 0)
   {
-    serialByte = Serial.read();
-    Serial.write(serialByte);
+    cmdbuf[cmdlen++] = Serial.read();
+    parseCmd();
   }
 }
 
