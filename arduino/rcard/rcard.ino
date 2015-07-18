@@ -223,11 +223,9 @@ byte ReadByte = 0;
 
 void loop()
 {
-    //Listen for commands
     if(Serial.available() > 0)
     {
         ReadByte = Serial.read();
-        Serial.write(ReadByte);
         Serial.write(ReadByte);
         return;
         switch(ReadByte)

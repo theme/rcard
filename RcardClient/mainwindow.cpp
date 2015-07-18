@@ -60,18 +60,15 @@ void MainWindow::sendCmd(int cmd_enum)
 {
     char readcmd[] = {'R', 0x0a, 0x0f};
     char idcmd[] = {'I'};
-    char *cmd;
 
     switch(cmd_enum){
     case CMD_READ:
-        cmd = readcmd;
+        port_.write(readcmd, sizeof readcmd);
         break;
     case CMD_ID:
-        cmd = idcmd;
+        port_.write(idcmd, sizeof idcmd);
         break;
     }
-
-    port_.write(cmd);
 }
 
 void MainWindow::on_chooseFileBtn_clicked()
