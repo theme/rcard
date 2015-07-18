@@ -37,6 +37,8 @@ private slots:
 
     void on_portToggle_toggled(bool checked);
 
+    void on_idButton_clicked();
+
 private:
     QString openSaveFile();
     void setPortParameters();

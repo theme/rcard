@@ -45,22 +45,16 @@ void MainWindow::choosePort()
 
 void MainWindow::readPort()
 {
-    QByteArray bytes;
-    char c;
-    QString text;
-    while ( port_.read(&c, 1)){
-        bytes.append(c);
-        text += QString(QByteArray::fromRawData(&c,1).toHex()).toUpper();
-        text += " ";
-    }
+    QByteArray bytes = port_.readAll();
+    QString text(bytes.toHex());
     this->addText(text);
 }
 
 void MainWindow::sendCmd(int cmd_enum)
 {
-    char readcmd[] = {'R', 0x0a, 0x0f};
-    char idcmd[] = {'I'};
-
+    qDebug() << "sendCmd()";
+    char readcmd[] = {'R', 0x00, 0xff};
+    char idcmd[] = {'S'};
     switch(cmd_enum){
     case CMD_READ:
         port_.write(readcmd, sizeof readcmd);
@@ -69,6 +63,9 @@ void MainWindow::sendCmd(int cmd_enum)
         port_.write(idcmd, sizeof idcmd);
         break;
     }
+    if (port_.error() != QSerialPort::NoError)
+        this->addText("error write Serial."+ port_.errorString());
+
 }
 
 void MainWindow::on_chooseFileBtn_clicked()
@@ -91,10 +88,11 @@ QString MainWindow::openSaveFile()
 
 void MainWindow::setPortParameters()
 {
-    port_.setBaudRate(38400);
-    port_.setDataBits(QSerialPort::Data8);
-    port_.setStopBits(QSerialPort::OneStop);
-    port_.setParity(QSerialPort::NoParity);
+    port_.setBaudRate(QSerialPort::Baud38400);
+    // arduino defauts to 8-n-1
+//    port_.setDataBits(QSerialPort::Data8);
+//    port_.setParity(QSerialPort::NoParity);
+//    port_.setStopBits(QSerialPort::OneStop);
 }
 
 void MainWindow::setPort(QString portName)
@@ -139,7 +137,8 @@ void MainWindow::addText(QString text)
 
 void MainWindow::on_readButton_clicked()
 {
-    this->openPort(port_.portName());
+    if (!port_.isOpen())
+        this->openPort(port_.portName());
     this->sendCmd(CMD_READ);
 }
 
@@ -150,4 +149,10 @@ void MainWindow::on_portToggle_toggled(bool checked)
     } else {
         this->closePort();
     }
+}
+
+void MainWindow::on_idButton_clicked()
+{
+    this->openPort(port_.portName());
+    this->sendCmd(CMD_ID);
 }
