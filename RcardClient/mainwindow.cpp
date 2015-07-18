@@ -11,7 +11,7 @@ MainWindow::MainWindow(QWidget *parent) :
         all_porots_.append(w);
         connect(w, SIGNAL(clicked(bool)),
                 this, SLOT(choosePort()));
-        ui->gpChoostPort->layout()->addWidget(w);
+        ui->gpPorts->layout()->addWidget(w);
     }
 
     connect(&port_, SIGNAL(readyRead()),
@@ -53,7 +53,7 @@ void MainWindow::readPort()
         text += QString(QByteArray::fromRawData(&c,1).toHex()).toUpper();
         text += " ";
     }
-    ui->text->appendPlainText(QTime::currentTime().toString() + "| "+ text);
+    this->addText(text);
 }
 
 void MainWindow::sendCmd(int cmd_enum)
@@ -108,26 +108,49 @@ void MainWindow::setPort(QString portName)
 
 void MainWindow::openPort(QString portName)
 {
-    if (portName.isEmpty())
-        return;
-    if ( port_.isOpen()) {      // close
-        port_.close();
-    }
-    if ( port_.portName() != portName) { // set
+    if ( port_.portName() != portName) {
+        if ( port_.isOpen()) {
+            port_.close();
+        }
         this->setPort( portName );
+        this->setPortParameters();
     }
-    this->setPortParameters();
-
+    if ( port_.isOpen() )
+        return;
     if (port_.open(QIODevice::ReadWrite)){  // open
-        ui->text->appendPlainText(port_.portName() + " opened.\n");
+        this->addText(port_.portName() + " opened.");
+        ui->portToggle->setChecked(true);
     } else {
-        ui->statusBar->showMessage("error open " + port_.portName());
+        this->addText("error open " + port_.portName());
         return;
     }
 }
 
-void MainWindow::on_saveButton_clicked()
+void MainWindow::closePort()
+{
+    if (port_.isOpen()){
+        port_.close();
+        this->addText(port_.portName() + " closed.");
+    }
+    ui->portToggle->setChecked(false);
+}
+
+void MainWindow::addText(QString text)
+{
+    ui->text->appendPlainText(QTime::currentTime().toString() + "| "+ text);
+}
+
+void MainWindow::on_readButton_clicked()
 {
     this->openPort(port_.portName());
     this->sendCmd(CMD_READ);
+}
+
+void MainWindow::on_portToggle_toggled(bool checked)
+{
+    if (checked) {
+        this->openPort(port_.portName());
+    } else {
+        this->closePort();
+    }
 }

@@ -33,13 +33,17 @@ private slots:
 
     void on_chooseFileBtn_clicked();
 
-    void on_saveButton_clicked();
+    void on_readButton_clicked();
+
+    void on_portToggle_toggled(bool checked);
 
 private:
     QString openSaveFile();
     void setPortParameters();
     void setPort(QString portName);
-    void openPort(QString portName);
+    void openPort(QString portName = QString());
+    void closePort();
+    void addText(QString text);
     Ui::MainWindow *ui;
     QSerialPort port_;
     QList<QRadioButton*> all_porots_;
