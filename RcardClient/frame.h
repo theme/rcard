@@ -8,8 +8,8 @@ class Frame : public QObject
     Q_OBJECT
 public:
     explicit Frame(QObject *parent = 0);
-    explicit Frame( unsigned int msb,
-                    unsigned int lsb,
+    explicit Frame( unsigned int block,
+                    unsigned int frame,
                     QByteArray data,
                     QObject *parent = 0);
     char checksum();
@@ -17,17 +17,20 @@ public:
     bool isFull();
     bool isEmpty();
     QString dataHex();
+    char msb();
+    char lsb();
 signals:
 
 public slots:
     int appendData(QByteArray data);
-    void setAddress( unsigned int msb, unsigned int lsb);
+    void setIndex(unsigned int block, unsigned int frame);
     void clear();
 private:
-    unsigned int msb_;
-    unsigned int lsb_;
+    char msb_;
+    char lsb_;
     QByteArray data_;
     char sum_;
+    unsigned long addr_;
 };
 
 #endif // FRAME_H

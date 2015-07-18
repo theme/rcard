@@ -31,7 +31,8 @@ public:
 private slots:
     void choosePort();
     void readPort();
-    void sendCmd(int cmd_enum);
+    void sendCmd(int cmd_enum, char msb=0, char lsb=0);
+    void readFrame(int block, int frame);
 
     void on_chooseFileBtn_clicked();
 

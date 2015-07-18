@@ -57,7 +57,6 @@ void MainWindow::readPort()
             bytes = bytes.mid(10);
         }
         i = frame_dbg_.appendData(bytes) ;
-        this->addText("append " + QString::number(i));
         if ( i < bytes.size() ){
             // get remote check sum
             char checksum = bytes.at(i);
@@ -66,7 +65,6 @@ void MainWindow::readPort()
             this->addText("remote status = " + char2Hex(status));
         }
         if (frame_dbg_.isFull()) {
-            frame_dbg_.setAddress(1,1);
             this->addText("got frame, sum = "+
                           frame_dbg_.checksumHex());
             this->addText(frame_dbg_.dataHex());
@@ -78,14 +76,13 @@ void MainWindow::readPort()
     }
 }
 
-void MainWindow::sendCmd(int cmd_enum)
+void MainWindow::sendCmd(int cmd_enum, char msb, char lsb)
 {
-    char readcmd[] = {'R',1,1};
+    char readcmd[] = {'R', msb, lsb};
     char idcmd[] = {'S'};
 
     switch(cmd_enum){
     case CMD_READ:
-        frame_dbg_.clear();
         port_.write(readcmd, sizeof readcmd);
         last_cmd_ = CMD_READ;
         break;
@@ -98,6 +95,13 @@ void MainWindow::sendCmd(int cmd_enum)
     if (port_.error() != QSerialPort::NoError)
         this->addText("error write Serial."+ port_.errorString());
 
+}
+
+void MainWindow::readFrame(int block, int frame)
+{
+    frame_dbg_.clear();
+    frame_dbg_.setIndex(block,frame);
+    this->sendCmd(CMD_READ, frame_dbg_.msb(), frame_dbg_.lsb());
 }
 
 void MainWindow::on_chooseFileBtn_clicked()
@@ -177,7 +181,7 @@ void MainWindow::on_readButton_clicked()
 {
     if (!port_.isOpen())
         this->openPort(port_.portName());
-    this->sendCmd(CMD_READ);
+    this->readFrame(0,0);
 }
 
 void MainWindow::on_portToggle_toggled(bool checked)

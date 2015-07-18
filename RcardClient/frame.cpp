@@ -6,10 +6,10 @@ Frame::Frame(QObject *parent) : QObject(parent),
 
 }
 
-Frame::Frame(unsigned int msb, unsigned int lsb, QByteArray data, QObject *parent) : QObject(parent),
+Frame::Frame(unsigned int block, unsigned int frame, QByteArray data, QObject *parent) : QObject(parent),
     msb_(0), lsb_(0), data_(QByteArray())
 {
-    this->setAddress(msb, lsb);
+    this->setIndex(block, frame);
     this->appendData(data);
 }
 
@@ -40,6 +40,16 @@ QString Frame::dataHex()
     return QString ( data_.toHex()).toUpper();
 }
 
+char Frame::msb()
+{
+    return msb_;
+}
+
+char Frame::lsb()
+{
+    return lsb_;
+}
+
 int Frame::appendData(QByteArray data)
 {
     int i = 0;
@@ -54,11 +64,16 @@ int Frame::appendData(QByteArray data)
     return i;
 }
 
-void Frame::setAddress(unsigned int msb, unsigned int lsb)
+void Frame::setIndex(unsigned int block, unsigned int frame)
 {
-    msb_ = msb;
+    if ( block > 15 || frame > 63) return;
+    /* block 0 - 15 , each 8KB*/
+    /* frame 0 - 63 , each 128 B */
+    addr_ = 8 * 1024 * block + 128 * frame;
+
+    msb_ = addr_;
     sum_ ^= msb_;
-    lsb_ = lsb;
+    lsb_ = (addr_>>8);
     sum_ ^= lsb_;
 }
 
