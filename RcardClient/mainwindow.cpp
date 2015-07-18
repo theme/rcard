@@ -47,14 +47,15 @@ void MainWindow::readPort()
 {
     QByteArray bytes = port_.readAll();
     QString text(bytes.toHex());
-    this->addText(text);
+    this->addText(text.toUpper());
+    qDebug() << bytes;
 }
 
 void MainWindow::sendCmd(int cmd_enum)
 {
-    qDebug() << "sendCmd()";
     char readcmd[] = {'R', 0x00, 0xff};
     char idcmd[] = {'S'};
+
     switch(cmd_enum){
     case CMD_READ:
         port_.write(readcmd, sizeof readcmd);
@@ -90,9 +91,9 @@ void MainWindow::setPortParameters()
 {
     port_.setBaudRate(QSerialPort::Baud38400);
     // arduino defauts to 8-n-1
-//    port_.setDataBits(QSerialPort::Data8);
-//    port_.setParity(QSerialPort::NoParity);
-//    port_.setStopBits(QSerialPort::OneStop);
+    port_.setDataBits(QSerialPort::Data8);
+    port_.setParity(QSerialPort::NoParity);
+    port_.setStopBits(QSerialPort::OneStop);
 }
 
 void MainWindow::setPort(QString portName)
@@ -108,11 +109,11 @@ void MainWindow::openPort(QString portName)
             port_.close();
         }
         this->setPort( portName );
-        this->setPortParameters();
     }
     if ( port_.isOpen() )
         return;
     if (port_.open(QIODevice::ReadWrite)){  // open
+        this->setPortParameters();
         this->addText(port_.portName() + " opened.");
         ui->portToggle->setChecked(true);
     } else {

@@ -242,7 +242,7 @@ void loop()
   if (Serial.available() > 0)
   {
     serialByte = Serial.read();
-    Serial.write(serialByte);
+    Serial.print("Hello!");
   }
 }
 
