@@ -54,7 +54,7 @@ void MainWindow::readPort()
     case CMD_READ:
         if ( frame_dbg_.isEmpty() ) {
             // skip header
-            bytes = bytes.mid(10);
+            bytes = bytes.mid(11);
         }
         i = frame_dbg_.appendData(bytes) ;
         if ( i < bytes.size() ){
@@ -99,6 +99,8 @@ void MainWindow::sendCmd(int cmd_enum, char msb, char lsb)
 
 void MainWindow::readFrame(int block, int frame)
 {
+    this->addText("readFrame " + QString::number(block)
+                  + " , " + QString::number(frame));
     frame_dbg_.clear();
     frame_dbg_.setIndex(block,frame);
     this->sendCmd(CMD_READ, frame_dbg_.msb(), frame_dbg_.lsb());
@@ -181,7 +183,8 @@ void MainWindow::on_readButton_clicked()
 {
     if (!port_.isOpen())
         this->openPort(port_.portName());
-    this->readFrame(0,0);
+    this->readFrame(ui->blockIndex->value(),
+                    ui->frameIndex->value());   // DEBUG
 }
 
 void MainWindow::on_portToggle_toggled(bool checked)
