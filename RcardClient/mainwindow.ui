@@ -122,7 +122,7 @@
        <item row="0" column="1">
         <widget class="QSpinBox" name="delayValue">
          <property name="minimum">
-          <number>500</number>
+          <number>1</number>
          </property>
          <property name="maximum">
           <number>24000</number>
