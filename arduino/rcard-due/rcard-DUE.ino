@@ -41,14 +41,13 @@
 #define PSX_SEL  AttPin
 #define PSX_ACK  AckPin
 
-// Arduino SPI Setting object
-SPISettings psxSetting(64000, LSBFIRST, SPI_MODE3);   // 250 KHz, LSB first, (CPOL=1, PSX clock idle when 1. CPHA=1, PSX host read data at clock up edge)
-//SPISettings psxSetting(25000000, LSBFIRST, SPI_MODE3);   // 250 KHz, LSB first, (CPOL=1, PSX clock idle when 1. CPHA=1, PSX host read data at clock up edge)
-
-unsigned long BYTE_DELAY  =   5000; // micro seconds ?
-unsigned long BYTE_DELAY_LONG  =   BYTE_DELAY * 6;
-
 #define FRAME_BUF_SIZE (10 + 128 + 2 + 8)
+
+// SPI setting var
+unsigned long SPI_SPEED = 250000;   // 250 KHz
+unsigned long SPI_SPEED_DIV = 2;   // speed divider
+unsigned long BYTE_DELAY  =   500; // micro seconds ?
+unsigned long BYTE_DELAY_LONG  =   BYTE_DELAY * 6;
 
 // LED
 void led_setup(){pinMode(13, OUTPUT);}
@@ -96,7 +95,8 @@ unsigned int fbp, datp;
 //Read a frame from Memory Card and send it to serial port
 void psx_read_frame(byte AddressMSB, byte AddressLSB)
 {
-  SPI.beginTransaction(psxSetting);
+  // PSX is LSB first, (CPOL=1, PSX clock idle when 1. CPHA=1, PSX host read data at clock up edge)
+  SPI.beginTransaction(SPISettings(SPI_SPEED/SPI_SPEED_DIV, LSBFIRST, SPI_MODE3));
   digitalWrite( PSX_SEL, LOW ); //Activate device
   
   fbp = 0;
@@ -173,8 +173,15 @@ void parseCmd() {
       Serial.write(cmdbuf[2]);
       break;
       
-    case 'S':
+    case 'S':   // set spi speed divider (one byte)
+      if (cmdlen < 2 ) return;
+      SPI_SPEED_DIV = cmdbuf[1] - '0';
       Serial.write('S');
+      Serial.write('0' + SPI_SPEED_DIV);
+      break;
+
+    case 'T':   // test read frame 0, 0
+      readFrameToSerial(0,0);
       break;
   }
   memset(cmdbuf, 0 , CMDLEN_MAX);
