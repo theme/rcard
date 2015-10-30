@@ -63,7 +63,7 @@ void MainWindow::readPort()
             bytes = bytes.mid(11);
         }
         i = frame_dbg_.appendData(bytes) ;
-        if ( i < bytes.size() ){
+        if ( i+1 < bytes.size() ){
             // get remote check sum
             char checksum = bytes.at(i);
             char status = bytes.at(i+1);
