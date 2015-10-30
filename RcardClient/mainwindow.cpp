@@ -79,6 +79,8 @@ void MainWindow::readPort()
         break;
     case GETID:
         break;
+    default:
+        break;
     }
 }
 

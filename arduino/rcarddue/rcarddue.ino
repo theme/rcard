@@ -153,13 +153,12 @@ void parseAndExeCmd() {
   switch (cmdbuf[0])
   {
     case READ:
-      if ( cmdlen < 3 ) break; // do not reset cmd buf
       delay(5); // avoid continus read
+      Serial.write(DATA);
       readFrameToSerial(cmdbuf[1], cmdbuf[2]);
       break;
 
     case SETDELAY:
-      if (cmdlen < 3 ) break;
       BYTE_DELAY = cmdbuf[1];
       BYTE_DELAY <<= 8;
       BYTE_DELAY += cmdbuf[2];
@@ -170,7 +169,6 @@ void parseAndExeCmd() {
       break;
 
     case SETSPEEDDIV:   // set spi speed divider (one byte)
-      if (cmdlen < 2 ) break;
       SPI_SPEED_DIV = cmdbuf[1];
       // ACK
       Serial.write(ACKSETSPEEDDIV);
@@ -188,13 +186,17 @@ void parseAndExeCmd() {
 }
 
 void loop()
-{
+{ 
   if (Serial.available() > 0)
   {
     cmdbuf[cmdlen++] = Serial.read();
-    parseAndExeCmd();
-    memset(cmdbuf, 0 , CMDLEN);
-    cmdlen = 0;
+
+    // process
+    if ( cmdlen >= CMDLEN || (cmdlen > 0 && Serial.available() == 0) ) {
+      parseAndExeCmd();
+      memset(cmdbuf, 0 , CMDLEN);
+      cmdlen = 0;
+    }
   }
 }
 
