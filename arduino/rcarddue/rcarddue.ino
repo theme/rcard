@@ -28,6 +28,8 @@
 #include "Arduino.h"
 #include "SPI.h"
 
+#include "serialcmd.h"
+
 //Memory Card Responses
 //0x47 - Good
 //0x4E - BadChecksum
