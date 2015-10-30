@@ -146,48 +146,45 @@ void setup()
   Serial.begin(38400);
 }
 
-#define CMDLEN_MAX 3
-byte cmdbuf[CMDLEN_MAX] = {0};
+byte cmdbuf[CMDLEN] = {0};
 unsigned cmdlen = 0;
 
-void parseCmd() {
+void parseAndExeCmd() {
   switch (cmdbuf[0])
   {
-    default:
-      Serial.write('E');
-      break;
-
-    case 'R':
-      if ( cmdlen < 3 ) return; // do not reset cmd buf
+    case READ:
+      if ( cmdlen < 3 ) break; // do not reset cmd buf
       delay(5); // avoid continus read
       readFrameToSerial(cmdbuf[1], cmdbuf[2]);
       break;
 
-    case 'D':   // set byte delay
-      if (cmdlen < 3 ) return;
+    case SETDELAY:
+      if (cmdlen < 3 ) break;
       BYTE_DELAY = cmdbuf[1];
       BYTE_DELAY <<= 8;
       BYTE_DELAY += cmdbuf[2];
-      cmdbuf[1] = BYTE_DELAY>>8;
-      cmdbuf[2] = BYTE_DELAY;
-      Serial.write('D');
-      Serial.write(cmdbuf[1]);
-      Serial.write(cmdbuf[2]);
-      break;
-      
-    case 'S':   // set spi speed divider (one byte)
-      if (cmdlen < 2 ) return;
-      SPI_SPEED_DIV = cmdbuf[1] - '0';
-      Serial.write('S');
-      Serial.write('0' + SPI_SPEED_DIV);
+      // ACK
+      Serial.write(ACKSETDELAY);
+      Serial.write(BYTE_DELAY >> 8);
+      Serial.write(BYTE_DELAY);
       break;
 
-    case 'T':   // test read frame 0, 0
-      readFrameToSerial(0,0);
+    case SETSPEEDDIV:   // set spi speed divider (one byte)
+      if (cmdlen < 2 ) break;
+      SPI_SPEED_DIV = cmdbuf[1];
+      // ACK
+      Serial.write(ACKSETSPEEDDIV);
+      Serial.write(SPI_SPEED_DIV);
+      break;
+
+    case GETID:   // test read frame 0, 0
+      Serial.write(UNKNOWNCMD);   // TODO
+      break;
+
+    default:
+      Serial.write(UNKNOWNCMD);
       break;
   }
-  memset(cmdbuf, 0 , CMDLEN_MAX);
-  cmdlen = 0;
 }
 
 void loop()
@@ -195,7 +192,9 @@ void loop()
   if (Serial.available() > 0)
   {
     cmdbuf[cmdlen++] = Serial.read();
-    parseCmd();
+    parseAndExeCmd();
+    memset(cmdbuf, 0 , CMDLEN);
+    cmdlen = 0;
   }
 }
 

@@ -57,7 +57,7 @@ void MainWindow::readPort()
 
     int i;
     switch ( last_cmd_ ) {
-    case CMD_READ:
+    case READ:
         if ( frame_dbg_.isEmpty() ) {
             // skip header
             bytes = bytes.mid(11);
@@ -77,7 +77,7 @@ void MainWindow::readPort()
             }
         }
         break;
-    case CMD_ID:
+    case GETID:
         break;
     }
 }
@@ -87,24 +87,22 @@ void MainWindow::sendCmd(int cmd_enum, char msb, char lsb)
     if (!port_.isOpen())
         this->openPort(port_.portName());
 
-    char readcmd[] = {'R', msb, lsb};
-    char idcmd[] = {'S'};
-    char delaycmd[] = {'D', msb, lsb};
+    char readcmd[] = {READ, msb, lsb};
+    char idcmd[] = {GETID};
+    char delaycmd[] = {SETDELAY, msb, lsb};
 
     switch(cmd_enum){
-    case CMD_READ:
+    case READ:
         port_.write(readcmd, sizeof readcmd);
-        last_cmd_ = CMD_READ;
         break;
-    case CMD_ID:
+    case GETID:
         port_.write(idcmd, sizeof idcmd);
-        last_cmd_ = CMD_ID;
         break;
-    case CMD_DELAY:
+    case SETDELAY:
         port_.write(delaycmd, sizeof delaycmd);
-        last_cmd_ = CMD_DELAY;
         break;
     }
+    last_cmd_ = cmd_enum;
 
     if (port_.error() != QSerialPort::NoError)
         this->addText("error write Serial."+ port_.errorString());
@@ -117,7 +115,7 @@ void MainWindow::readFrame(int block, int frame)
                   + " , " + QString::number(frame));
     frame_dbg_.clear();
     frame_dbg_.setIndex(block,frame);
-    this->sendCmd(CMD_READ, frame_dbg_.msb(), frame_dbg_.lsb());
+    this->sendCmd(READ, frame_dbg_.msb(), frame_dbg_.lsb());
 }
 
 void MainWindow::on_chooseFileBtn_clicked()
@@ -205,7 +203,7 @@ void MainWindow::on_portToggle_toggled(bool checked)
 
 void MainWindow::on_idButton_clicked()
 {
-    this->sendCmd(CMD_ID);
+    this->sendCmd(GETID);
 }
 
 void MainWindow::on_readFrameBtn_clicked()
@@ -219,7 +217,7 @@ void MainWindow::on_setDelayBtn_clicked()
     unsigned long d = ui->delayValue->value();
     char msb = d >> 8;
     char lsb = d;
-    this->sendCmd(CMD_DELAY, msb, lsb);
+    this->sendCmd(SETDELAY, msb, lsb);
 }
 
 void MainWindow::on_saveCardButton_clicked()

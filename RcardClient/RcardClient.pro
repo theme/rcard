@@ -19,6 +19,7 @@ SOURCES += main.cpp\
 
 HEADERS  += mainwindow.h \
     frame.h \
-    memcard.h
+    memcard.h \
+    serialcmd.h
 
 FORMS    += mainwindow.ui

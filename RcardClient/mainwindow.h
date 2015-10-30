@@ -12,6 +12,10 @@
 
 #include "memcard.h"
 
+extern "C" {
+    #include "serialcmd.h"
+}
+
 namespace Ui {
 class MainWindow;
 }
@@ -23,12 +27,6 @@ class MainWindow : public QMainWindow
 public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
-
-    enum CMD {
-        CMD_READ,
-        CMD_ID,
-        CMD_DELAY
-    };
 
 signals:
     void sigFrameGot();
