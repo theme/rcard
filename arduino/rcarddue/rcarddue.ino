@@ -44,9 +44,9 @@
 #define PSX_ACK  AckPin
 
 // SPI setting var
-unsigned long SPI_SPEED = 250000;   // 250 KHz
-unsigned long SPI_SPEED_DIV = 2;   // speed divider
-unsigned long BYTE_DELAY  =   1500; // time of 1500 cycles of 250KHz
+unsigned long SPI_SPEED = 250000;   // 200 KHz  // bug: due HW SPI can only as slow as 84M/255 = 329.9KHz
+unsigned long SPI_SPEED_DIV = 1;   // speed divider
+unsigned long BYTE_DELAY  =   50; // time of 1500 cycles of 250KHz
 
 // LED
 void led_setup(){pinMode(13, OUTPUT);}
@@ -217,6 +217,7 @@ void parseAndExeCmd() {
 
     default:
       Serial.write(UNKNOWNCMD);
+      Serial.write(cmdbuf[0]);
       break;
   }
 }
