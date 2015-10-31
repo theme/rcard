@@ -14,7 +14,7 @@ MainWindow::MainWindow(QWidget *parent) :
         ui->gpPorts->layout()->addWidget(w);
     }
 
-    connect(&port_, SIGNAL(readyRead()),
+    connect(&port_, SIGNAL(readyRead()),    // async , use signal / slot, event loop
             this, SLOT(readPort()));
 
     connect(&rcard_timer_, SIGNAL(timeout()),
@@ -52,18 +52,33 @@ void MainWindow::choosePort()
 void MainWindow::readPort()
 {
     QByteArray bytes = port_.readAll();
-    QString text = QString(bytes.toHex());
-    this->addText(text.toUpper());
+    // TODO: debug:
+    this->addText("DEBUG echo:" + bytes.toHex());
+    return;
 
     int i;
-    switch ( last_cmd_ ) {
-    case READ:
+    QByteArray ackdata(bytes.mid(1));
+    switch((enum SERIALCMD)bytes.at(0)){
+    case UNKNOWNCMD:
+        this->addText(">> unknown cmd.");
+        break;
+    case CARDID:
+        this->addText(">> card id: " + (unsigned long)(ackdata.at(0) << 8 + ackdata.at(1)));
+        this->addText("   in ack data:" + ackdata.toHex());
+        break;
+    case ACKSETDELAY:
+        this->addText(">> Delay set: " + ackdata.toHex());
+        break;
+    case ACKSETSPEEDDIV:
+        this->addText(">> Speed Div set: " + ackdata.toHex());
+        break;
+    case FRAMEDATA:
         if ( frame_dbg_.isEmpty() ) {
             // skip header
             bytes = bytes.mid(11);
         }
         i = frame_dbg_.appendData(bytes) ;
-        if ( i+1 < bytes.size() ){
+        if ( i+1 <= bytes.size() ){
             // get remote check sum
             char checksum = bytes.at(i);
             char status = bytes.at(i+1);
@@ -77,10 +92,8 @@ void MainWindow::readPort()
             }
         }
         break;
-    case GETID:
-        break;
     default:
-        break;
+        this->addText(bytes.toHex());
     }
 }
 
@@ -89,21 +102,9 @@ void MainWindow::sendCmd(int cmd_enum, char msb, char lsb)
     if (!port_.isOpen())
         this->openPort(port_.portName());
 
-    char readcmd[] = {READ, msb, lsb};
-    char idcmd[] = {GETID};
-    char delaycmd[] = {SETDELAY, msb, lsb};
-
-    switch(cmd_enum){
-    case READ:
-        port_.write(readcmd, sizeof readcmd);
-        break;
-    case GETID:
-        port_.write(idcmd, sizeof idcmd);
-        break;
-    case SETDELAY:
-        port_.write(delaycmd, sizeof delaycmd);
-        break;
-    }
+    char buf[] = {cmd_enum, msb, lsb};  // also : cmd, arg0, arg1
+    this->addText("<< " + QByteArray(buf,sizeof buf).toHex());
+    port_.write(buf, sizeof buf);
     last_cmd_ = cmd_enum;
 
     if (port_.error() != QSerialPort::NoError)
@@ -267,4 +268,12 @@ void MainWindow::saveCard2File()
 void MainWindow::on_stopReadButton_clicked()
 {
     rcard_timer_.stop();
+}
+
+void MainWindow::on_setSpeedDivBtn_clicked()
+{
+    unsigned int d = ui->speedDivValue->value();
+    char msb = d >> 8;
+    char lsb = d;
+    this->sendCmd(SETSPEEDDIV, msb, lsb);
 }

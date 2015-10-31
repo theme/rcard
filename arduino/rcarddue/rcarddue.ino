@@ -43,8 +43,6 @@
 #define PSX_SEL  AttPin
 #define PSX_ACK  AckPin
 
-#define FRAME_BUF_SIZE (10 + 128 + 2 + 8)
-
 // SPI setting var
 unsigned long SPI_SPEED = 250000;   // 250 KHz
 unsigned long SPI_SPEED_DIV = 2;   // speed divider
@@ -91,7 +89,8 @@ byte psx_spi_xfer_byte(byte Byte, unsigned int Delay) {
 }
 
 // data frame buffer
-char fb[FRAME_BUF_SIZE];  // read cmd header + frame data + 2 checksum + 8 byte 0x5C if 3rd party card.
+
+char fb[1 + 10 + 128 + 2 + 8];  // read cmd header + frame data + 2 checksum + 8 byte 0x5C if 3rd party card.
 unsigned int fbp, datp;
 
 //Read a frame from Memory Card and send it to serial port
@@ -101,7 +100,7 @@ void psx_read_frame(byte AddressMSB, byte AddressLSB)
   SPI.beginTransaction(SPISettings(SPI_SPEED/SPI_SPEED_DIV, LSBFIRST, SPI_MODE3));
   digitalWrite( PSX_SEL, LOW ); //Activate device
   
-  fbp = 0;
+  fbp = 1;
   fb[fbp++] = psx_spi_xfer_byte(0x81, BYTE_DELAY);      //Access Memory Card // FF (Error code)
 //  goto debug;
   fb[fbp++] = psx_spi_xfer_byte(0x52, BYTE_DELAY);      //Send read command // 00
@@ -133,8 +132,44 @@ void readFrameToSerial(byte AddressMSB, byte AddressLSB){
   // read a frame from memory card
   psx_read_frame(AddressMSB, AddressLSB);
   // wite back to serial
+  fb[0] = FRAMEDATA;
   for (int i = 0; i < sizeof fb; i++) {
     Serial.write(fb[i]);
+  }
+}
+
+// Get ID from Memory Card
+// ID buffer
+char idb[1+10];  // idb[2] -> id 1, idb[3] -> id 2
+unsigned int idbp;
+void psx_read_id()
+{
+  SPI.beginTransaction(SPISettings(SPI_SPEED/SPI_SPEED_DIV, LSBFIRST, SPI_MODE3));
+  digitalWrite( PSX_SEL, LOW ); //Activate device
+  
+  idbp = 1;
+  idb[idbp++] = psx_spi_xfer_byte(0x81, BYTE_DELAY);      //Access Memory Card // FF (Error code)
+  idb[idbp++] = psx_spi_xfer_byte(0x53, BYTE_DELAY);      //Send get id command // flag
+  idb[idbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Memory Card ID1  //5A
+  idb[idbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Memory Card ID2  //5D
+  idb[idbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Receive command ack//5C
+  idb[idbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Receive command ack//5D
+  idb[idbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);  // 04
+  idb[idbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);  // 00
+  idb[idbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);  // 00
+  idb[idbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);  // 80
+
+debug:
+  digitalWrite( PSX_SEL, HIGH); //Deactivate device
+  SPI.endTransaction();
+}
+
+void readIdToSerial(){
+  psx_read_id();
+  // wite back to serial
+  idb[0] = CARDID;
+  for (int i = 0; i < sizeof idb; i++) {
+    Serial.write(idb[i]);
   }
 }
 
@@ -154,7 +189,6 @@ void parseAndExeCmd() {
   {
     case READ:
       delay(5); // avoid continus read
-      Serial.write(DATA);
       readFrameToSerial(cmdbuf[1], cmdbuf[2]);
       break;
 
@@ -170,13 +204,16 @@ void parseAndExeCmd() {
 
     case SETSPEEDDIV:   // set spi speed divider (one byte)
       SPI_SPEED_DIV = cmdbuf[1];
+      SPI_SPEED_DIV <<= 8;
+      SPI_SPEED_DIV += cmdbuf[2];
       // ACK
       Serial.write(ACKSETSPEEDDIV);
+      Serial.write(SPI_SPEED_DIV >> 8);
       Serial.write(SPI_SPEED_DIV);
       break;
 
     case GETID:   // test read frame 0, 0
-      Serial.write(UNKNOWNCMD);   // TODO
+      readIdToSerial();
       break;
 
     default:
@@ -192,7 +229,7 @@ void loop()
     cmdbuf[cmdlen++] = Serial.read();
 
     // process
-    if ( cmdlen >= CMDLEN || (cmdlen > 0 && Serial.available() == 0) ) {
+    if ( cmdlen >= CMDLEN ) {   // protocol: all cmd must be of same length CMDLEN
       parseAndExeCmd();
       memset(cmdbuf, 0 , CMDLEN);
       cmdlen = 0;

@@ -14,7 +14,8 @@ enum SERIALCMD {
     UNKNOWNCMD,
     ACKSETDELAY,
     ACKSETSPEEDDIV,
-    DATA
+    FRAMEDATA,
+    CARDID
 };
 
 #endif /* SERIALCMD_H */

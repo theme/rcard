@@ -54,6 +54,8 @@ private slots:
     void saveCard2File();
     void on_stopReadButton_clicked();
 
+    void on_setSpeedDivBtn_clicked();
+
 private:
     QString openSaveFile();
     void setPortParameters();
