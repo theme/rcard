@@ -269,11 +269,3 @@ void MainWindow::on_stopReadButton_clicked()
 {
     rcard_timer_.stop();
 }
-
-void MainWindow::on_setSpeedDivBtn_clicked()
-{
-    unsigned int d = ui->speedDivValue->value();
-    char msb = d >> 8;
-    char lsb = d;
-    this->sendCmd(SETSPEEDDIV, msb, lsb);
-}

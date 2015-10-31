@@ -7,7 +7,6 @@ enum SERIALCMD {
     /* client > board */
     READ,
     SETDELAY,
-    SETSPEEDDIV,
     GETID,
 
     /* board > client */
