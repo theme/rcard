@@ -46,8 +46,7 @@
 // SPI setting var
 unsigned long SPI_SPEED = 250000;   // 250 KHz
 unsigned long SPI_SPEED_DIV = 2;   // speed divider
-unsigned long BYTE_DELAY  =   500; // micro seconds ?
-unsigned long BYTE_DELAY_LONG  =   BYTE_DELAY * 6;
+unsigned long BYTE_DELAY  =   1500; // time of 1500 cycles of 250KHz
 
 // LED
 void led_setup(){pinMode(13, OUTPUT);}
@@ -71,7 +70,7 @@ void psx_spi_setup() {
 }
 
 // small sub routine
-byte psx_spi_xfer_byte(byte Byte, unsigned int Delay) {
+byte psx_spi_xfer_byte(byte Byte, unsigned long Delay) {
   led_on();
   byte rcvByte = SPI.transfer(Byte);
   while ( Delay > 0 ) // Poll for the ACK signal from the Memory Card
@@ -106,12 +105,12 @@ void psx_read_frame(byte AddressMSB, byte AddressLSB)
   fb[fbp++] = psx_spi_xfer_byte(0x52, BYTE_DELAY);      //Send read command // 00
   fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Memory Card ID1  //5A
   fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Memory Card ID2  //5D
-  fb[fbp++] = psx_spi_xfer_byte(AddressMSB, BYTE_DELAY_LONG);      //Address MSB //00
-  fb[fbp++] = psx_spi_xfer_byte(AddressLSB, BYTE_DELAY_LONG);      //Address LSB //00
-  fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY_LONG);      //Memory Card ACK1  //5C
-  fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY_LONG);      //Memory Card ACK2  //5C
-  fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY_LONG);      //Confirm MSB // 5D
-  fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY_LONG);      //Confirm LSB // FF
+  fb[fbp++] = psx_spi_xfer_byte(AddressMSB, BYTE_DELAY);      //Address MSB //00
+  fb[fbp++] = psx_spi_xfer_byte(AddressLSB, BYTE_DELAY);      //Address LSB //00
+  fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY * 22);      //Memory Card ACK1  //5C //;<-- late /ACK after this byte-pair
+  fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Memory Card ACK2  //5C
+  fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Confirm MSB // 5D
+  fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Confirm LSB // FF
 
   datp = fbp;
   //Get 128 byte data from the frame
