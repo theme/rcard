@@ -46,7 +46,7 @@
 // SPI setting var
 unsigned long SPI_SPEED = 250000;   // 200 KHz  // bug: due HW SPI can only as slow as 84M/255 = 329.9KHz
 unsigned long SPI_SPEED_DIV = 1;   // speed divider
-unsigned long BYTE_DELAY  =   50; // time of 1500 cycles of 250KHz
+unsigned long BYTE_DELAY  =   1500; // time of 1500 cycles of 250KHz
 
 // LED
 void led_setup(){pinMode(13, OUTPUT);}
@@ -76,7 +76,7 @@ byte psx_spi_xfer_byte(byte Byte, unsigned long Delay) {
   while ( Delay > 0 ) // Poll for the ACK signal from the Memory Card
   {
     Delay--;
-    delayMicroseconds(1);
+    __asm__("nop\n\t"); 
     // test irq
     if ( f_psx_ack ) {
       f_psx_ack = false; // reset irq flag
