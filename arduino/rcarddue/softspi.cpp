@@ -74,11 +74,6 @@ SoftSPI::setup(){
 
 void
 SoftSPI::beginTransfer(){
-    // clock
-    if (sets_.CPOL_)
-        digitalWrite(pins_.SCK_, HIGH);
-    else
-        digitalWrite(pins_.SCK_, LOW);
     // ss enable
     digitalWrite(pins_.SS_, LOW);
 }
@@ -96,10 +91,15 @@ SoftSPI::transfer(uint8_t data){
         }
     }
     // clock
-    if (sets_.CPOL_)
+    if (sets_.CPOL_) {
         digitalWrite(pins_.SCK_, HIGH);
-    else
+        digitalWrite(pins_.MOSI_, HIGH);
+    }
+    else {
         digitalWrite(pins_.SCK_, LOW);
+        digitalWrite(pins_.MOSI_, LOW);
+    }
+    
     // data and clock
     i = 0;
     while ( i++ < 8 ){
@@ -110,7 +110,7 @@ SoftSPI::transfer(uint8_t data){
         }
 
         // half T
-//        wait(halfBitCycle_);
+        wait(halfBitCycle_);
         if (sets_.CPOL_)
             digitalWrite(pins_.SCK_, LOW);
         else
@@ -129,7 +129,7 @@ SoftSPI::transfer(uint8_t data){
         }
 
         // half T
-//        wait(halfBitCycle_);
+        wait(halfBitCycle_);
         if (sets_.CPOL_)
             digitalWrite(pins_.SCK_, HIGH);
         else
@@ -143,6 +143,16 @@ SoftSPI::transfer(uint8_t data){
         }
     }
 
+    // byte end
+    // TODO : if not continue
+    if (sets_.CPOL_) {
+        digitalWrite(pins_.SCK_, HIGH);
+        digitalWrite(pins_.MOSI_, HIGH);
+    }
+    else {
+        digitalWrite(pins_.SCK_, LOW);
+        digitalWrite(pins_.MOSI_, LOW);
+    }
     // byte delay
     for( delayCounter_ = 0 ; delayCounter_ < delayCycle_ ; delayCounter_++ ){}
 
@@ -153,25 +163,32 @@ uint8_t
 SoftSPI::mode3Transfer(uint8_t data){
     int i = 0;
     uint8_t tmp = data;
-    // reverse data when LSBFIRST
-    if (sets_.bitOrder_ == LSBFIRST){
+    // reverse data when MSBFIRST
+    if (sets_.bitOrder_ == MSBFIRST){
         data = BitReverseTable256[data];
     }
     // clock
+    if (sets_.CPOL_) {
         digitalWrite(pins_.SCK_, HIGH);
+        digitalWrite(pins_.MOSI_, HIGH);
+    }
+    else {
+        digitalWrite(pins_.SCK_, LOW);
+        digitalWrite(pins_.MOSI_, LOW);
+    }
+    
     // data and clock
     i = 0;
     while ( i++ < 8 ){
         // half T
-       // wait(halfBitCycle_);
+            wait(halfBitCycle_);
             digitalWrite(pins_.SCK_, LOW);
 
         // IO
-            data <<= i;
-            digitalWrite(pins_.MOSI_, (data & 0x80) ? HIGH: LOW);
+            digitalWrite(pins_.MOSI_, ((data >> i)& 0x01) ? HIGH: LOW);
 
         // half T
-//        wait(halfBitCycle_);
+            wait(halfBitCycle_);
             digitalWrite(pins_.SCK_, HIGH);
 
         // IO
@@ -180,8 +197,22 @@ SoftSPI::mode3Transfer(uint8_t data){
                 tmp += 1;
     }
 
+    
+    // byte end
+    // TODO : if not continue
+    if (sets_.CPOL_) {
+        digitalWrite(pins_.SCK_, HIGH);
+        digitalWrite(pins_.MOSI_, HIGH);
+    }
+    else {
+        digitalWrite(pins_.SCK_, LOW);
+        digitalWrite(pins_.MOSI_, LOW);
+    }
+
     // byte delay
-    for( delayCounter_ = 0 ; delayCounter_ < delayCycle_ ; delayCounter_++ ){}
+    for( delayCounter_ = 0 ; delayCounter_ < delayCycle_ ; delayCounter_++ ){
+      __asm__("nop\n\t");
+      }
 
     return tmp;
 }

@@ -48,9 +48,9 @@
 
 // SPI setting var
 unsigned long SPI_CLOCK = 240000;   // 240 KHz
-unsigned long SPI_BYTE_DELAY  =  100000;
+unsigned long SPI_BYTE_DELAY  =  200000;
 SPIpins pins(MOSI, MISO, SCK, SS);
-SoftSPISettings sets(SPI_CLOCK, SPI_BYTE_DELAY, LSBFIRST, 0);
+SoftSPISettings sets(SPI_CLOCK, SPI_BYTE_DELAY, LSBFIRST, 3);
 SoftSPI sspi(84000000, sets, pins); // due is 84 MHz  // BUG: can only achieve 89 kHz, mem card no response
 
 // LED
@@ -78,6 +78,7 @@ void psx_spi_setup() {
 byte psx_spi_xfer_byte(byte Byte) {
   led_on();
   byte rcvByte = sspi.mode3Transfer(Byte);
+//  byte rcvByte = sspi.transfer(Byte);
   led_off();
   return rcvByte; // return the received byte
 }

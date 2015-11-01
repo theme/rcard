@@ -76,6 +76,7 @@ class SoftSPI {
         void inline wait(uint32_t cycle){
             while( cycle != 0 ){
                 cycle--;
+                __asm__("nop\n\t");
             }
         }
 
