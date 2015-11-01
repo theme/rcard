@@ -36,22 +36,22 @@
 //0xFF - BadSector
 
 //Define pins
-#define MOSI 31
-#define MISO 33
-#define SCK 35
+#define MOSI 33
+#define MISO 31
+#define SCK 39
 #define SS 37
 
-#define ACK 32           //Acknowledge            // external IRQ, (All digital pin on Arduino DUE is supported)
+#define ACK 41           //Acknowledge            // external IRQ, (All digital pin on Arduino DUE is supported)
 
 // user schema for PSX
 #define PSX_ACK  ACK
 
 // SPI setting var
-unsigned long SPI_CLOCK = 240000;   // 240 KHz    // TODO: 111kHz
+unsigned long SPI_CLOCK = 240000;   // 240 KHz
 unsigned long SPI_BYTE_DELAY  =  100000;
 SPIpins pins(MOSI, MISO, SCK, SS);
 SoftSPISettings sets(SPI_CLOCK, SPI_BYTE_DELAY, LSBFIRST, 0);
-SoftSPI sspi(84000000, sets, pins); // due is 84 MHz
+SoftSPI sspi(84000000, sets, pins); // due is 84 MHz  // BUG: can only achieve 89 kHz, mem card no response
 
 // LED
 void led_setup(){pinMode(13, OUTPUT);}
@@ -77,7 +77,7 @@ void psx_spi_setup() {
 // small sub routine
 byte psx_spi_xfer_byte(byte Byte) {
   led_on();
-  byte rcvByte = sspi.transfer(Byte);
+  byte rcvByte = sspi.mode3Transfer(Byte);
   led_off();
   return rcvByte; // return the received byte
 }
