@@ -15,6 +15,7 @@ int MemCard::nextFrame()
 void MemCard::insertFrame(Frame *f)
 {
     frames_.insert(f->findex(), f);
+    qDebug() << "MemCard::insertFrame(Frame *f), size()=" << frames_.size();
     if (isFull())
         emit sigFull();
 }
@@ -39,5 +40,6 @@ QByteArray MemCard::data()
 void MemCard::clear()
 {
     frames_.clear();
+    qDebug() << "MemCard::clear(), nextFrame()=" << this->nextFrame();
 }
 

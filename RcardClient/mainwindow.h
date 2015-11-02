@@ -31,7 +31,7 @@ private slots:
     void choosePort();
     void processACK();
 
-    bool sendCmd(int cmd_enum, char msb=0, char lsb=0);
+    bool sendCmd(unsigned char cmd_enum, unsigned char msb=0, unsigned char lsb=0);
     void readFrame(int findex);
 
     void on_chooseFileBtn_clicked();
@@ -52,8 +52,10 @@ private slots:
 
     void on_setSpeedDivBtn_clicked();
 
+    void on_savePartialBtn_clicked();
+
 private:
-    QString openSaveFile();
+    QString dialogChooseSaveFileName();
     void addText(QString text);
     QString char2Hex(char c);
     Ui::MainWindow *ui;

@@ -51,7 +51,7 @@ void MainWindow::processACK()
     case FRAMEDATA:
         this->addText(">> FRAMEDATA: " + ack.toHex());
         if( f->isGood() ) {
-            this->addText("Good.");
+            this->addText("Good Frame " +  QString::number(f->findex()));
             if(!card_.isFull())
                 card_.insertFrame(f);
         }
@@ -61,7 +61,7 @@ void MainWindow::processACK()
     }
 }
 
-bool MainWindow::sendCmd(int cmd_enum, char msb, char lsb)
+bool MainWindow::sendCmd(unsigned char cmd_enum, unsigned char msb, unsigned char lsb)
 {
     QByteArray cmdarg;
     cmdarg.resize(3);
@@ -94,13 +94,14 @@ void MainWindow::readFrame(int findex)
 
 void MainWindow::on_chooseFileBtn_clicked()
 {
-    QString fn = openSaveFile();
-    if ( fn != ui->fileName->text() )
-    ui->fileName->setText(fn);
-    card_.clear();
+    QString fn = dialogChooseSaveFileName();
+    if ( fn != ui->fileName->text() ){
+        ui->fileName->setText(fn);
+        card_.clear();
+    }
 }
 
-QString MainWindow::openSaveFile()
+QString MainWindow::dialogChooseSaveFileName()
 {
     QString selfilter = tr("Memory Card File (*.mcr)");
     QString fn = QFileDialog::getSaveFileName( this,
@@ -146,7 +147,7 @@ void MainWindow::on_readFrameBtn_clicked()
 {
     int bindex = ui->blockIndex->value();
     int findex = ui->frameIndex->value();
-    this->readFrame(bindex * 16 + findex);
+    this->readFrame(bindex * 64 + findex);
 }
 
 void MainWindow::on_setDelayBtn_clicked()
@@ -159,7 +160,7 @@ void MainWindow::on_setDelayBtn_clicked()
 
 void MainWindow::on_saveCardButton_clicked()
 {
-    rcard_timer_.setInterval(1000);
+    rcard_timer_.setInterval(200);
     rcard_timer_.start();
 }
 
@@ -176,16 +177,22 @@ void MainWindow::onRcardTimer()
     if ( addr >= 0){
         this->readFrame(addr);
     }
-    rcard_timer_.start();
+    if( !card_.isFull())
+        rcard_timer_.start();
 }
 
 void MainWindow::saveCard2File()
 {
-    QFile f(ui->fileName);
+    QFile f(ui->fileName->text());
     if (f.open(QIODevice::WriteOnly)){
-        f.write(card_.data());
+        qint64 c = f.write(card_.data());
         f.close();
-        this->addText(f.fileName() + "All card saved.");
+        if ( c == card_.data().size() && card_.isFull())
+            this->addText(f.fileName() + ": All card saved.");
+        else if ( c == card_.data().size() && !card_.isFull())
+            this->addText(f.fileName() + ": Partial card saved.");
+    } else {    // not all data in card_ wrote to file
+        this->addText("error open file for write: " + f.fileName() + " " + f.errorString());
     }
 }
 
@@ -200,4 +207,9 @@ void MainWindow::on_setSpeedDivBtn_clicked()
     char msb = d >> 8;
     char lsb = d;
     this->sendCmd(SETSPEEDDIV, msb, lsb);
+}
+
+void MainWindow::on_savePartialBtn_clicked()
+{
+    this->saveCard2File();
 }

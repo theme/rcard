@@ -5,6 +5,8 @@
 #include <QHash>
 #include "frame.h"
 
+#include <QDebug>
+
 class MemCard : public QObject
 {
     Q_OBJECT

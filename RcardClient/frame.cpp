@@ -20,7 +20,9 @@ Frame::Frame(QByteArray ack, QObject *parent) : QObject(parent),
 
     sum_ = checksum;
     data_ = ack.mid(11,128);
-    findex_ = (ack.at(9) << 8 ) + ack.at(10);
+    findex_ = (unsigned char)(ack.at(9));
+    findex_ <<= 8;
+    findex_ |= (unsigned char)(ack.at(10));
     good_ = true;
 }
 
