@@ -10,8 +10,8 @@ class MemCard : public QObject
     Q_OBJECT
 public:
     explicit MemCard(QObject *parent = 0);
-    qint32 needFrameAtAddr();
-    void insertFrame(Frame &f);
+    int nextFrame();
+    void insertFrame(Frame *f);
     bool isFull();
     QByteArray data();
 signals:
@@ -20,7 +20,7 @@ signals:
 public slots:
     void clear();
 private:
-    QHash< quint32, Frame* > frames_;
+    QHash<int, Frame*> frames_;
 };
 
 #endif // MEMCARD_H

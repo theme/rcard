@@ -2,10 +2,8 @@
 #define SERIALCMD_H
 
 enum SERIALCMD {
-    /* CMD 3 byte,  CMD | ARG0 | ARG1 */ 
-    CMDLEN = 3,
     /* client > board */
-    READ,
+    READFRAME,
     SETDELAY,
     SETSPEEDDIV,
     GETID,
@@ -17,5 +15,11 @@ enum SERIALCMD {
     FRAMEDATA,
     CARDID
 };
+
+const int CMDLEN = 3;
+
+const int GETID_ACK_SIZE = (1 + 10);
+const int READFRAME_ACK_SIZE = (1 + 10 + 128 + 2 + 1);
+const int DEFAULT_ACK_SIZE = 3;
 
 #endif /* SERIALCMD_H */

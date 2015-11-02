@@ -27,15 +27,12 @@ public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
 
-signals:
-    void sigFrameGot();
-
 private slots:
     void choosePort();
     void processACK();
 
     bool sendCmd(int cmd_enum, char msb=0, char lsb=0);
-    void readFrame(int bindex, int findex);
+    void readFrame(int findex);
 
     void on_chooseFileBtn_clicked();
 
@@ -50,7 +47,6 @@ private slots:
     void on_saveCardButton_clicked();
 
     void onRcardTimer();
-    void saveFrame();
     void saveCard2File();
     void on_stopReadButton_clicked();
 
@@ -63,7 +59,6 @@ private:
     Ui::MainWindow *ui;
     QList<QRadioButton*> all_porots_;
 
-    Frame frame_dbg_;
     MemCard card_;
     QTimer rcard_timer_;
 

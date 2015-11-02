@@ -14,13 +14,14 @@ class SerialHost : public QObject
 public:
     explicit SerialHost(QObject *parent = 0);
     // send out cmdarg bytes, set ack length and ack time out in ms
-    bool sendCmd(const QByteArray& cmdarg, int acklen, int ackms = 1000);
+    bool sendCmd(const QByteArray& cmdarg, int acklen, int ackms = 10);
     const QByteArray &ack();
     void setPort(QString port);
     QString portName();
 
     bool openPort();
     void closePort();
+    bool isOpen();
 signals:
     void sigPortOpened(bool success = true);
     void sigPortClosed();

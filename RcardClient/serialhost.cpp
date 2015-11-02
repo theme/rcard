@@ -92,15 +92,14 @@ void SerialHost::closePort()
     qDebug() << port_.portName() << " closed.";
 }
 
-void SerialHost::onPortReadyRead()      // TODO
+bool SerialHost::isOpen()
 {
-    if(WAITACK != stat_) {
-        qDebug() << " DEBUG| onPortReadyRead() && not in WAITACK" << this->dbgState_();
-        port_.readAll();
-        return;
-    }
+    return port_.isOpen();
+}
+
+void SerialHost::onPortReadyRead()
+{
     ack_.append(port_.readAll());
-    qDebug() << ack_.toHex();
 
     if (ack_.size() >= acklen_){
         ackTimer_.stop();

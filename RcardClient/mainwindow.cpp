@@ -6,7 +6,6 @@ MainWindow::MainWindow(QWidget *parent) :
     ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-
     foreach( QSerialPortInfo i, QSerialPortInfo::availablePorts()){
         QRadioButton *w = new QRadioButton(i.portName(), this);
         all_porots_.append(w);
@@ -14,11 +13,11 @@ MainWindow::MainWindow(QWidget *parent) :
         ui->gpPorts->layout()->addWidget(w);
     }
 
-    connect(&rcard_timer_, SIGNAL(timeout()),
-            this, SLOT(onRcardTimer()));
-
-    connect(this, SIGNAL(sigFrameGot()),
-            this, SLOT(saveFrame()));
+    connect(&sh_, SIGNAL(sigGotAck()), this, SLOT(processACK()));
+    connect(&sh_, SIGNAL(sigPortOpened(bool)), ui->portToggle, SLOT(setChecked(bool)));
+    connect(&rcard_timer_, SIGNAL(timeout()), this, SLOT(onRcardTimer()));
+    connect(&card_, SIGNAL(sigFull()), &rcard_timer_, SLOT(stop()));
+    connect(&card_, SIGNAL(sigFull()), this, SLOT(saveCard2File()));
 
     // auto select if only one serial port
     if ( all_porots_.length() == 1 ){
@@ -26,9 +25,6 @@ MainWindow::MainWindow(QWidget *parent) :
         w->setChecked(true);
         sh_.setPort(w->text());
     }
-
-    connect(&sh_, SIGNAL(sigGotAck()), this, SLOT(processACK()));
-    connect(&sh_, SIGNAL(sigPortOpened(bool)), ui->portToggle, SLOT(setChecked(bool)));
 }
 
 MainWindow::~MainWindow()
@@ -48,49 +44,20 @@ void MainWindow::choosePort()
 
 void MainWindow::processACK()
 {
-    QByteArray bytes = sh_.ack();
-    // TODO: debug:
-    this->addText("DEBUG echo:" + bytes.toHex());
-    return;
+    QByteArray ack = sh_.ack();
+    Frame *f = new Frame(ack, this);
 
-    int i;
-    QByteArray ackdata(bytes.mid(1));
-    switch((enum SERIALCMD)bytes.at(0)){
-    case UNKNOWNCMD:
-        this->addText(">> unknown cmd.");
-        break;
-    case CARDID:
-        this->addText(">> card id: " + (unsigned long)(ackdata.at(0) << 8 + ackdata.at(1)));
-        this->addText("   in ack data:" + ackdata.toHex());
-        break;
-    case ACKSETDELAY:
-        this->addText(">> Delay set: " + ackdata.toHex());
-        break;
-    case ACKSETSPEEDDIV:
-        this->addText(">> Speed Div set: " + ackdata.toHex());
-        break;
+    switch((enum SERIALCMD)ack.at(0)){
     case FRAMEDATA:
-        if ( frame_dbg_.isEmpty() ) {
-            // skip header
-            bytes = bytes.mid(11);
-        }
-        i = frame_dbg_.appendData(bytes) ;
-        if ( i+1 <= bytes.size() ){
-            // get remote check sum
-            char checksum = bytes.at(i);
-            char status = bytes.at(i+1);
-            if ( status == 0x47
-                 && checksum == frame_dbg_.checksum()
-                 && frame_dbg_.isFull()){
-                emit sigFrameGot();
-                this->addText("got frame "
-                              + frame_dbg_.indexString());
-                this->addText(frame_dbg_.dataHex());
-            }
+        this->addText(">> FRAMEDATA: " + ack.toHex());
+        if( f->isGood() ) {
+            this->addText("Good.");
+            if(!card_.isFull())
+                card_.insertFrame(f);
         }
         break;
     default:
-        this->addText(bytes.toHex());
+        this->addText(ack.toHex());
     }
 }
 
@@ -104,15 +71,14 @@ bool MainWindow::sendCmd(int cmd_enum, char msb, char lsb)
 
     int acklen = 1;  // unknown cmd ack
     switch(cmd_enum){
-    case READ:
-        acklen = 1 + 10 + 128 + 2 + 1;
-        break;
-    case SETDELAY:
-    case SETSPEEDDIV:
-        acklen = 3;
+    case READFRAME:
+        acklen = READFRAME_ACK_SIZE;
         break;
     case GETID:
-        acklen =  1 + 10;
+        acklen = GETID_ACK_SIZE;
+        break;
+    default:
+        acklen = DEFAULT_ACK_SIZE;
         break;
     }
     if (!sh_.sendCmd(cmdarg, acklen)) return false;
@@ -120,14 +86,10 @@ bool MainWindow::sendCmd(int cmd_enum, char msb, char lsb)
     return true;
 }
 
-void MainWindow::readFrame(int bindex, int findex)
+void MainWindow::readFrame(int findex)
 {
-    frame_dbg_.clear();
-    frame_dbg_.setIndex(bindex,findex);
-    if(this->sendCmd(READ, frame_dbg_.msb(), frame_dbg_.lsb()))
-        this->addText("readFrame " + QString::number(bindex)
-                      + " , " + QString::number(findex));
-
+    if(this->sendCmd(READFRAME, (findex>>8) & 0xFF, findex & 0xFF))
+        this->addText("<< read frame " + QString::number(findex));
 }
 
 void MainWindow::on_chooseFileBtn_clicked()
@@ -176,13 +138,15 @@ void MainWindow::on_portToggle_toggled(bool checked)
 
 void MainWindow::on_idButton_clicked()
 {
-    this->sendCmd(GETID);
+    if(this->sendCmd(GETID))
+        this->addText("<< get id ");
 }
 
 void MainWindow::on_readFrameBtn_clicked()
 {
-    this->readFrame(ui->blockIndex->value(),
-                    ui->frameIndex->value());   // DEBUG
+    int bindex = ui->blockIndex->value();
+    int findex = ui->frameIndex->value();
+    this->readFrame(bindex * 16 + findex);
 }
 
 void MainWindow::on_setDelayBtn_clicked()
@@ -195,34 +159,24 @@ void MainWindow::on_setDelayBtn_clicked()
 
 void MainWindow::on_saveCardButton_clicked()
 {
-    rcard_timer_.start(1000);
+    rcard_timer_.setInterval(1000);
+    rcard_timer_.start();
 }
 
 void MainWindow::onRcardTimer()
 {
+    qDebug() << "onRcardTimer()";
     rcard_timer_.stop();
-    qint32 addr;
-    if ( !card_.isFull() ){
-        // which frame is need ?
-        addr  = card_.needFrameAtAddr();
-        // set frame
-        if ( 0 != frame_dbg_.addr() - addr){
-            frame_dbg_.clear();
-            frame_dbg_.setAddress(addr);
-        }
-        // read frame
-        this->readFrame(frame_dbg_.block(),
-                        frame_dbg_.frame());
+    if (!sh_.isOpen())
+        return;
 
-        rcard_timer_.start(1000);
-    } else {
-        saveCard2File();
+    int addr = card_.nextFrame();
+    qDebug() << "nextFrame()" << QString::number(addr);
+
+    if ( addr >= 0){
+        this->readFrame(addr);
     }
-}
-
-void MainWindow::saveFrame()
-{
-    card_.insertFrame(frame_dbg_);
+    rcard_timer_.start();
 }
 
 void MainWindow::saveCard2File()
@@ -231,7 +185,7 @@ void MainWindow::saveCard2File()
     if (f.open(QIODevice::WriteOnly)){
         f.write(card_.data());
         f.close();
-        this->addText(f.fileName() + " saved.");
+        this->addText(f.fileName() + "All card saved.");
     }
 }
 

@@ -149,7 +149,7 @@ void psx_read_id()
   idb[idbp++] = CARDID;  // ACK type: for serial protocol
   
   idb[idbp++] = psx_spi_xfer_byte(0x81, BYTE_DELAY);      //Access Memory Card // N/A (dummy response)
-  idb[idbp++] = psx_spi_xfer_byte(0x53, BYTE_DELAY);      //Send get id command // flag
+  idb[idbp++] = psx_spi_xfer_byte(0x53, BYTE_DELAY);      //Send get id command // flag (only Sony card supports)
   idb[idbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Memory Card ID1  //5A
   idb[idbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Memory Card ID2  //5D
   idb[idbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Receive command ack//5C
@@ -184,7 +184,7 @@ unsigned cmdlen = 0;
 void parseAndExeCmd() {
   switch (cmdbuf[0])
   {
-    case READ:
+    case READFRAME:
       delay(5); // avoid continus read
       readFrameToSerial(cmdbuf[1], cmdbuf[2]);
       break;

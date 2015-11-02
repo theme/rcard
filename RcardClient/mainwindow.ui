@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>383</width>
-    <height>532</height>
+    <height>565</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -63,7 +63,7 @@
        <item row="2" column="1">
         <widget class="QPushButton" name="saveCardButton">
          <property name="text">
-          <string>&amp;Save Card &gt; File</string>
+          <string>loop &amp;Save</string>
          </property>
         </widget>
        </item>

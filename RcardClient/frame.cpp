@@ -1,128 +1,37 @@
 #include "frame.h"
 
-Frame::Frame(QObject *parent) : QObject(parent),
-    msb_(0), lsb_(0), data_(QByteArray())
+Frame::Frame(QByteArray ack, QObject *parent) : QObject(parent),
+    good_(false)
 {
+    if ( ack.size() != READFRAME_ACK_SIZE ) return;
 
-}
+    // header
+    if (! ( 0x5A == ack.at(3) &&
+            0x5D == ack.at(4) &&
+            0x5C == ack.at(7) &&
+            0x3F >= ack.at(9) ) )
+        return;
 
-Frame::Frame(unsigned int block, unsigned int frame, QByteArray data, QObject *parent) : QObject(parent),
-    msb_(0), lsb_(0), data_(QByteArray())
-{
-    this->setIndex(block, frame);
-    this->appendData(data);
-}
+    // check sum
+    char checksum = ack.at(9) ^ ack.at(10);
+    int i = 11;
+    while (i < 11 + 128 ){ checksum ^= ack.at(i++); }
+    if (checksum != ack.at(i)) return;
 
-Frame::Frame(Frame &other)
-{
-    msb_ = other.msb();
-    lsb_ = other.lsb();
-    data_ = other.data();
-    sum_ = other.checksum();
-    addr_ = other.addr();
+    sum_ = checksum;
+    data_ = ack.mid(11,128);
+    findex_ = (ack.at(9) << 8 ) + ack.at(10);
+    good_ = true;
 }
 
 char Frame::checksum()
-{
-    return sum_;
-}
+{ return sum_; }
 
-QString Frame::checksumHex()
-{
-    char s = this->checksum();
-    QByteArray a(&s, 1);
-    return QString(a.toHex());
-}
+bool Frame::isGood()
+{ return good_; }
 
-bool Frame::isFull()
-{
-    return data_.size() == 128;
-}
+const QByteArray& Frame::data() const
+{ return data_; }
 
-bool Frame::isEmpty()
-{
-    return data_.size() == 0;
-}
-
-QString Frame::dataHex()
-{
-    return QString ( data_.toHex()).toUpper();
-}
-
-QString Frame::indexString()
-{
-    return QString::number(block_) + "," + QString::number(frame_);
-}
-
-unsigned int Frame::block()
-{
-    return block_;
-}
-
-unsigned int Frame::frame()
-{
-    return frame_;
-}
-
-char Frame::msb()
-{
-    return msb_;
-}
-
-char Frame::lsb()
-{
-    return lsb_;
-}
-
-QByteArray Frame::data()
-{
-    return data_;
-}
-
-unsigned long Frame::addr()
-{
-    return addr_;
-}
-
-int Frame::appendData(QByteArray data)
-{
-    int i = 0;
-    for (; i< data.size(); ++i){
-        if ( data_.size() < 128) {
-            data_.append(data.at(i));
-            sum_ ^= data.at(i);
-        } else {
-            return i;
-        }
-    }
-    return i;
-}
-
-void Frame::setIndex(unsigned int block, unsigned int frame)
-{
-    if ( block > 15 || frame > 63) return;
-    /* block 0 - 15 , each 8KB*/
-    /* frame 0 - 63 , each 128 B */
-    block_ = block;
-    frame_= frame;
-    addr_ = 8 * 1024 * block + 128 * frame;
-
-    msb_ = addr_;
-    sum_ ^= msb_;
-    lsb_ = (addr_>>8);
-    sum_ ^= lsb_;
-}
-
-void Frame::clear()
-{
-    msb_ = lsb_ = sum_ = 0;
-    data_.clear();
-}
-
-void Frame::setAddress(unsigned long addr)
-{
-    block_ = addr / (64 * 128);
-    frame_ = (addr % (64 *128)) / 128;
-    this->setIndex(block_, frame_);
-}
-
+int Frame::findex() const
+{ return findex_; }
