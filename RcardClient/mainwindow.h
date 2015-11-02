@@ -33,6 +33,7 @@ signals:
 private slots:
     void choosePort();
     void processACK();
+
     bool sendCmd(int cmd_enum, char msb=0, char lsb=0);
     void readFrame(int bindex, int findex);
 
@@ -61,7 +62,6 @@ private:
     QString char2Hex(char c);
     Ui::MainWindow *ui;
     QList<QRadioButton*> all_porots_;
-    int last_cmd_;
 
     Frame frame_dbg_;
     MemCard card_;

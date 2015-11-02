@@ -100,7 +100,7 @@ void psx_read_frame(byte AddressMSB, byte AddressLSB)
   digitalWrite( PSX_SEL, LOW ); //Activate device
   
   fbp = 1;
-  fb[fbp++] = psx_spi_xfer_byte(0x81, BYTE_DELAY);      //Access Memory Card // FF (Error code)
+              psx_spi_xfer_byte(0x81, BYTE_DELAY);      //Access Memory Card // FF (Error code)
 //  goto debug;
   fb[fbp++] = psx_spi_xfer_byte(0x52, BYTE_DELAY);      //Send read command // 00
   fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Memory Card ID1  //5A
@@ -121,6 +121,7 @@ void psx_read_frame(byte AddressMSB, byte AddressLSB)
   fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Checksum (MSB xor LSB xor Data)
   fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Memory Card status byte
   fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      // 3rd party tail
+  fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      // one byte dummy shift for SPI
 
 debug:
   digitalWrite( PSX_SEL, HIGH); //Deactivate device
@@ -147,7 +148,7 @@ void psx_read_id()
   digitalWrite( PSX_SEL, LOW ); //Activate device
   
   idbp = 1;
-  idb[idbp++] = psx_spi_xfer_byte(0x81, BYTE_DELAY);      //Access Memory Card // FF (Error code)
+                psx_spi_xfer_byte(0x81, BYTE_DELAY);      //Access Memory Card // FF (Error code)
   idb[idbp++] = psx_spi_xfer_byte(0x53, BYTE_DELAY);      //Send get id command // flag
   idb[idbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Memory Card ID1  //5A
   idb[idbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Memory Card ID2  //5D
@@ -157,6 +158,8 @@ void psx_read_id()
   idb[idbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);  // 00
   idb[idbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);  // 00
   idb[idbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);  // 80
+  
+  idb[idbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      // one byte dummy shift for SPI
 
 debug:
   digitalWrite( PSX_SEL, HIGH); //Deactivate device
