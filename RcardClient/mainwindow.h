@@ -2,8 +2,6 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <QSerialPortInfo>
-#include <QSerialPort>
 #include <QRadioButton>
 #include <QFileDialog>
 #include <QTime>
@@ -11,6 +9,7 @@
 #include <QDebug>
 
 #include "memcard.h"
+#include "serialhost.h"
 
 extern "C" {
     #include "serialcmd.h"
@@ -33,9 +32,9 @@ signals:
 
 private slots:
     void choosePort();
-    void readPort();
-    void sendCmd(int cmd_enum, char msb=0, char lsb=0);
-    void readFrame(int block, int frame);
+    void processACK();
+    bool sendCmd(int cmd_enum, char msb=0, char lsb=0);
+    void readFrame(int bindex, int findex);
 
     void on_chooseFileBtn_clicked();
 
@@ -58,20 +57,17 @@ private slots:
 
 private:
     QString openSaveFile();
-    void setPortParameters();
-    void setPort(QString portName);
-    void openPort(QString portName = QString());
-    void closePort();
     void addText(QString text);
     QString char2Hex(char c);
     Ui::MainWindow *ui;
-    QSerialPort port_;
     QList<QRadioButton*> all_porots_;
     int last_cmd_;
 
     Frame frame_dbg_;
     MemCard card_;
     QTimer rcard_timer_;
+
+    SerialHost sh_;
 };
 
 #endif // MAINWINDOW_H

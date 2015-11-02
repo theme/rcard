@@ -6,16 +6,13 @@ MainWindow::MainWindow(QWidget *parent) :
     ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+
     foreach( QSerialPortInfo i, QSerialPortInfo::availablePorts()){
         QRadioButton *w = new QRadioButton(i.portName(), this);
         all_porots_.append(w);
-        connect(w, SIGNAL(clicked(bool)),
-                this, SLOT(choosePort()));
+        connect(w, SIGNAL(clicked(bool)), this, SLOT(choosePort()));
         ui->gpPorts->layout()->addWidget(w);
     }
-
-    connect(&port_, SIGNAL(readyRead()),    // async , use signal / slot, event loop
-            this, SLOT(readPort()));
 
     connect(&rcard_timer_, SIGNAL(timeout()),
             this, SLOT(onRcardTimer()));
@@ -27,8 +24,11 @@ MainWindow::MainWindow(QWidget *parent) :
     if ( all_porots_.length() == 1 ){
         QRadioButton *w = all_porots_.first();
         w->setChecked(true);
-        this->setPort(w->text());
+        sh_.setPort(w->text());
     }
+
+    connect(&sh_, SIGNAL(sigGotAck()), this, SLOT(processACK()));
+    connect(&sh_, SIGNAL(sigPortOpened(bool)), ui->portToggle, SLOT(setChecked(bool)));
 }
 
 MainWindow::~MainWindow()
@@ -38,20 +38,17 @@ MainWindow::~MainWindow()
 
 void MainWindow::choosePort()
 {
-    if (port_.isOpen())
-        port_.close();
-
     foreach(QRadioButton *w, all_porots_){
         if(w->isChecked()){
-            this->setPort(w->text());
+            sh_.setPort(w->text());
             break;
         }
     }
 }
 
-void MainWindow::readPort()
+void MainWindow::processACK()
 {
-    QByteArray bytes = port_.readAll();
+    QByteArray bytes = sh_.ack();
     // TODO: debug:
     this->addText("DEBUG echo:" + bytes.toHex());
     return;
@@ -97,28 +94,40 @@ void MainWindow::readPort()
     }
 }
 
-void MainWindow::sendCmd(int cmd_enum, char msb, char lsb)
+bool MainWindow::sendCmd(int cmd_enum, char msb, char lsb)
 {
-    if (!port_.isOpen())
-        this->openPort(port_.portName());
+    QByteArray cmdarg;
+    cmdarg.resize(3);
+    cmdarg[0] = cmd_enum;
+    cmdarg[1] = msb;
+    cmdarg[2] = lsb;
 
-    char buf[] = {cmd_enum, msb, lsb};  // also : cmd, arg0, arg1
-    this->addText("<< " + QByteArray(buf,sizeof buf).toHex());
-    port_.write(buf, sizeof buf);
-    last_cmd_ = cmd_enum;
-
-    if (port_.error() != QSerialPort::NoError)
-        this->addText("error write Serial."+ port_.errorString());
-
+    int acklen = 1;  // unknown cmd ack
+    switch(cmd_enum){
+    case READ:
+        acklen = 1 + 10 + 128 + 2 + 8;
+        break;
+    case SETDELAY:
+    case SETSPEEDDIV:
+        acklen = 3;
+        break;
+    case GETID:
+        acklen =  1 + 10;
+        break;
+    }
+    if (!sh_.sendCmd(cmdarg, acklen)) return false;
+    this->addText("<< " + cmdarg.toHex());
+    return true;
 }
 
-void MainWindow::readFrame(int block, int frame)
+void MainWindow::readFrame(int bindex, int findex)
 {
-    this->addText("readFrame " + QString::number(block)
-                  + " , " + QString::number(frame));
     frame_dbg_.clear();
-    frame_dbg_.setIndex(block,frame);
-    this->sendCmd(READ, frame_dbg_.msb(), frame_dbg_.lsb());
+    frame_dbg_.setIndex(bindex,findex);
+    if(this->sendCmd(READ, frame_dbg_.msb(), frame_dbg_.lsb()))
+        this->addText("readFrame " + QString::number(bindex)
+                      + " , " + QString::number(findex));
+
 }
 
 void MainWindow::on_chooseFileBtn_clicked()
@@ -140,50 +149,6 @@ QString MainWindow::openSaveFile()
     return fn;
 }
 
-void MainWindow::setPortParameters()
-{
-    port_.setBaudRate(QSerialPort::Baud38400);
-    // arduino defauts to 8-n-1
-    port_.setDataBits(QSerialPort::Data8);
-    port_.setParity(QSerialPort::NoParity);
-    port_.setStopBits(QSerialPort::OneStop);
-}
-
-void MainWindow::setPort(QString portName)
-{
-    port_.setPortName(portName);
-    this->statusBar()->showMessage(portName);
-}
-
-void MainWindow::openPort(QString portName)
-{
-    if ( port_.portName() != portName) {
-        if ( port_.isOpen()) {
-            port_.close();
-        }
-        this->setPort( portName );
-    }
-    if ( port_.isOpen() )
-        return;
-    if (port_.open(QIODevice::ReadWrite)){  // open
-        this->setPortParameters();
-        this->addText(port_.portName() + " opened.");
-        ui->portToggle->setChecked(true);
-    } else {
-        this->addText("error open " + port_.portName());
-        return;
-    }
-}
-
-void MainWindow::closePort()
-{
-    if (port_.isOpen()){
-        port_.close();
-        this->addText(port_.portName() + " closed.");
-    }
-    ui->portToggle->setChecked(false);
-}
-
 void MainWindow::addText(QString text)
 {
     ui->text->appendPlainText(QTime::currentTime().toString() + "| "+ text);
@@ -197,10 +162,15 @@ QString MainWindow::char2Hex(char c)
 
 void MainWindow::on_portToggle_toggled(bool checked)
 {
-    if (checked) {
-        this->openPort(port_.portName());
-    } else {
-        this->closePort();
+    if (!checked)
+        sh_.closePort();
+    else {
+        if (sh_.openPort())
+            this->addText("opened " + sh_.portName());
+        else {
+            this->addText("failed open " + sh_.portName());
+            ui->portToggle->setChecked(false);
+        }
     }
 }
 

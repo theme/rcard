@@ -15,11 +15,13 @@ TEMPLATE = app
 SOURCES += main.cpp\
         mainwindow.cpp \
     frame.cpp \
-    memcard.cpp
+    memcard.cpp \
+    serialhost.cpp
 
 HEADERS  += mainwindow.h \
     frame.h \
     memcard.h \
-    serialcmd.h
+    serialcmd.h \
+    serialhost.h
 
 FORMS    += mainwindow.ui

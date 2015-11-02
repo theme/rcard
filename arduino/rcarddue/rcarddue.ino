@@ -89,7 +89,7 @@ byte psx_spi_xfer_byte(byte Byte, unsigned long Delay) {
 
 // data frame buffer
 
-char fb[1 + 10 + 128 + 2 + 8];  // read cmd header + frame data + 2 checksum + 8 byte 0x5C if 3rd party card.
+char fb[1 + 10 + 128 + 2 + 8];  //acktype + read cmd header + frame data + 2 checksum + 8 byte 0x5C if 3rd party card.
 unsigned int fbp, datp;
 
 //Read a frame from Memory Card and send it to serial port
