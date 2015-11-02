@@ -105,7 +105,7 @@ bool MainWindow::sendCmd(int cmd_enum, char msb, char lsb)
     int acklen = 1;  // unknown cmd ack
     switch(cmd_enum){
     case READ:
-        acklen = 1 + 10 + 128 + 2 + 8;
+        acklen = 1 + 10 + 128 + 2 + 1;
         break;
     case SETDELAY:
     case SETSPEEDDIV:

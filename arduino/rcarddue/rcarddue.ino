@@ -89,8 +89,8 @@ byte psx_spi_xfer_byte(byte Byte, unsigned long Delay) {
 
 // data frame buffer
 
-char fb[1 + 10 + 128 + 2 + 8];  //acktype + read cmd header + frame data + 2 checksum + 8 byte 0x5C if 3rd party card.
-unsigned int fbp, datp;
+char fb[1 + 10 + 128 + 2 + 1];  //acktype + read cmd header + frame data + 2 checksum + 8 byte 0x5C if 3rd party card.
+unsigned int fbp;
 
 //Read a frame from Memory Card and send it to serial port
 void psx_read_frame(byte AddressMSB, byte AddressLSB)
@@ -99,29 +99,29 @@ void psx_read_frame(byte AddressMSB, byte AddressLSB)
   SPI.beginTransaction(SPISettings(SPI_SPEED/SPI_SPEED_DIV, LSBFIRST, SPI_MODE3));
   digitalWrite( PSX_SEL, LOW ); //Activate device
   
-  fbp = 1;
-              psx_spi_xfer_byte(0x81, BYTE_DELAY);      //Access Memory Card // FF (Error code)
-//  goto debug;
-  fb[fbp++] = psx_spi_xfer_byte(0x52, BYTE_DELAY);      //Send read command // 00
+  fbp = 0;
+  fb[fbp++] = FRAMEDATA;  // ACK type: for serial protocol
+  
+  fb[fbp++] = psx_spi_xfer_byte(0x81, BYTE_DELAY);      //Access Memory Card // N/A (dummy response)
+  fb[fbp++] = psx_spi_xfer_byte(0x52, BYTE_DELAY);      //Send read command // FLAG
   fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Memory Card ID1  //5A
   fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Memory Card ID2  //5D
-  fb[fbp++] = psx_spi_xfer_byte(AddressMSB, BYTE_DELAY);      //Address MSB //00
-  fb[fbp++] = psx_spi_xfer_byte(AddressLSB, BYTE_DELAY);      //Address LSB //00
-  fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY * 22);      //Memory Card ACK1  //5C //;<-- late /ACK after this byte-pair
-  fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Memory Card ACK2  //5C
-  fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Confirm MSB // 5D
-  fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Confirm LSB // FF
-
-  datp = fbp;
-  //Get 128 byte data from the frame
+  fb[fbp++] = psx_spi_xfer_byte(AddressMSB, BYTE_DELAY);      // sector number MSB //(00)
+  fb[fbp++] = psx_spi_xfer_byte(AddressLSB, BYTE_DELAY);      // sector number LSB //(pre)
+  fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY * 22);       // ACK 1 //5C //;<-- late /ACK after this byte-pair
+  fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);            // ACK 2  //5D
+  fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Confirm MSB // MSB  // (Sony) FFFFh for invalid addr, (3rd) data of Sector & 3FFh
+  fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Confirm LSB // LSB
+  
   for (int i = 0; i < 128; i++)
   {
-    fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);
+    fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);    //Get 128 byte data from the frame
   }
+  
   fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Checksum (MSB xor LSB xor Data)
-  fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Memory Card status byte
-  fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      // 3rd party tail
-  fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      // one byte dummy shift for SPI
+  fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Memory Card status byte (should be 47h="G"=Good for Read)
+  
+  fb[fbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      // 5Ch (3rd party tail ?) /  FEh(BETOP TM?)
 
 debug:
   digitalWrite( PSX_SEL, HIGH); //Deactivate device
@@ -131,8 +131,6 @@ debug:
 void readFrameToSerial(byte AddressMSB, byte AddressLSB){
   // read a frame from memory card
   psx_read_frame(AddressMSB, AddressLSB);
-  // wite back to serial
-  fb[0] = FRAMEDATA;
   for (int i = 0; i < sizeof fb; i++) {
     Serial.write(fb[i]);
   }
@@ -140,15 +138,17 @@ void readFrameToSerial(byte AddressMSB, byte AddressLSB){
 
 // Get ID from Memory Card
 // ID buffer
-char idb[1+10];  // idb[2] -> id 1, idb[3] -> id 2
+char idb[1 + 10];  // idb[2] -> id 1, idb[3] -> id 2
 unsigned int idbp;
 void psx_read_id()
 {
   SPI.beginTransaction(SPISettings(SPI_SPEED/SPI_SPEED_DIV, LSBFIRST, SPI_MODE3));
   digitalWrite( PSX_SEL, LOW ); //Activate device
   
-  idbp = 1;
-                psx_spi_xfer_byte(0x81, BYTE_DELAY);      //Access Memory Card // FF (Error code)
+  idbp = 0;
+  idb[idbp++] = CARDID;  // ACK type: for serial protocol
+  
+  idb[idbp++] = psx_spi_xfer_byte(0x81, BYTE_DELAY);      //Access Memory Card // N/A (dummy response)
   idb[idbp++] = psx_spi_xfer_byte(0x53, BYTE_DELAY);      //Send get id command // flag
   idb[idbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Memory Card ID1  //5A
   idb[idbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      //Memory Card ID2  //5D
@@ -158,18 +158,13 @@ void psx_read_id()
   idb[idbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);  // 00
   idb[idbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);  // 00
   idb[idbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);  // 80
-  
-  idb[idbp++] = psx_spi_xfer_byte(0x00, BYTE_DELAY);      // one byte dummy shift for SPI
 
-debug:
   digitalWrite( PSX_SEL, HIGH); //Deactivate device
   SPI.endTransaction();
 }
 
 void readIdToSerial(){
   psx_read_id();
-  // wite back to serial
-  idb[0] = CARDID;
   for (int i = 0; i < sizeof idb; i++) {
     Serial.write(idb[i]);
   }
